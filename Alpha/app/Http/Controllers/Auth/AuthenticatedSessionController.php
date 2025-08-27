@@ -33,9 +33,15 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = Auth::user(); // Logged-in user from central DB
+
+        // Store tenant identification info (e.g., tenant_id or domain/subdomain)
+        if ($user->tenant_id) {
+            session(['tenant_id' => $user->tenant_id]);
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
-
     /**
      * Destroy an authenticated session.
      */

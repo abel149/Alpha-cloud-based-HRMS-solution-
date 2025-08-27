@@ -11,6 +11,19 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
+    public function store(LoginRequest $request)
+    {
+        $request->authenticate();
+
+        $request->session()->regenerate();
+
+        // Store tenant ID in session
+        $user = Auth::user();
+        session(['tenant_id' => $user->tenant_id, 'role' => $user->role,]);
+
+        return redirect()->intended(route('dashboard', absolute: false));
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -29,6 +42,9 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
+            'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
+            'role' => 'required|in:company_admin,hr_manager,finance_manager,department_manager,employee',
+
         ];
     }
 
@@ -39,19 +55,23 @@ class LoginRequest extends FormRequest
      */
     public function authenticate(): void
     {
-        $this->ensureIsNotRateLimited();
+        $credentials = $this->only('email', 'password', 'tenant_id');
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+        // First, find the user with email, tenant, and role
+        $user = \App\Models\User::where('email', $this->email)
+            ->where('tenant_id', $this->tenant_id)
+            ->where('role', $this->role)
+            ->first();
 
+        if (! $user || ! Auth::attempt(
+            ['email' => $this->email, 'password' => $this->password, 'tenant_id' => $this->tenant_id, 'role' => $this->role],
+            $this->boolean('remember')
+        )) {
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => __('auth.failed'),
             ]);
         }
-
-        RateLimiter::clear($this->throttleKey());
     }
-
     /**
      * Ensure the login request is not rate limited.
      *
@@ -80,6 +100,6 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->string('email')) . '|' . $this->ip());
     }
 }
