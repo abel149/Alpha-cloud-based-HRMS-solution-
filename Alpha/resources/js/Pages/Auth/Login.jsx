@@ -8,8 +8,10 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
+        tenant_id: '',   
         email: '',
         password: '',
+        role: 'employee',
         remember: false,
     });
 
@@ -32,9 +34,24 @@ export default function Login({ status, canResetPassword }) {
             )}
 
             <form onSubmit={submit}>
-                <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                {/* Tenant ID */}
+                <div className="mt-4">
+                    <InputLabel htmlFor="tenant_id" value="Tenant ID" />
+                    <TextInput
+                        id="tenant_id"
+                        type="text"
+                        name="tenant_id"
+                        value={data.tenant_id}
+                        className="mt-1 block w-full"
+                        autoComplete="off"
+                        onChange={(e) => setData('tenant_id', e.target.value)}
+                    />
+                    <InputError message={errors.tenant_id} className="mt-2" />
+                </div>
 
+                {/* Email */}
+                <div className="mt-4">
+                    <InputLabel htmlFor="email" value="Email" />
                     <TextInput
                         id="email"
                         type="email"
@@ -45,13 +62,12 @@ export default function Login({ status, canResetPassword }) {
                         isFocused={true}
                         onChange={(e) => setData('email', e.target.value)}
                     />
-
                     <InputError message={errors.email} className="mt-2" />
                 </div>
 
+                {/* Password */}
                 <div className="mt-4">
                     <InputLabel htmlFor="password" value="Password" />
-
                     <TextInput
                         id="password"
                         type="password"
@@ -61,10 +77,29 @@ export default function Login({ status, canResetPassword }) {
                         autoComplete="current-password"
                         onChange={(e) => setData('password', e.target.value)}
                     />
-
                     <InputError message={errors.password} className="mt-2" />
                 </div>
 
+                {/* Role */}
+                <div className="mt-4">
+                    <InputLabel htmlFor="role" value="Role" />
+                    <select
+                        id="role"
+                        name="role"
+                        value={data.role}
+                        className="mt-1 block w-full border-gray-300 rounded-md"
+                        onChange={(e) => setData('role', e.target.value)}
+                    >
+                        <option value="company_admin">Company Admin</option>
+                        <option value="hr_manager">HR Manager</option>
+                        <option value="finance_manager">Finance Manager</option>
+                        <option value="department_manager">Department Manager</option>
+                        <option value="employee">Employee</option>
+                    </select>
+                    <InputError message={errors.role} className="mt-2" />
+                </div>
+
+                {/* Remember me */}
                 <div className="mt-4 block">
                     <label className="flex items-center">
                         <Checkbox
@@ -80,6 +115,7 @@ export default function Login({ status, canResetPassword }) {
                     </label>
                 </div>
 
+                {/* Actions */}
                 <div className="mt-4 flex items-center justify-end">
                     {canResetPassword && (
                         <Link

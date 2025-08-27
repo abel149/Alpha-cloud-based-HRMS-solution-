@@ -18,6 +18,22 @@ Route::middleware(['auth', SwitchTenantDatabase::class])->group(function () {
     // More tenant-specific routes here
 });
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
+
+Route::middleware(['auth', SwitchTenantDatabase::class])->get('/tenant-users-json', function () {
+    // Query the users table in the tenant database
+    $users = DB::connection('Tenant')->table('users')->get();
+
+    return response()->json([
+        'tenant_id' => Auth::user()->tenant_id,
+        'connected_db' => DB::connection('Tenant')->getDatabaseName(),
+        'users' => $users,
+    ]);
+});
+
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),

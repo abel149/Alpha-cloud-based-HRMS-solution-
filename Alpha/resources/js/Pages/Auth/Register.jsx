@@ -7,11 +7,14 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-    });
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+    role: 'employee',         // default value
+    tenant_id: '',            // or pre-filled if you have a value
+});
+
 
     const submit = (e) => {
         e.preventDefault();
@@ -101,6 +104,40 @@ export default function Register() {
                         className="mt-2"
                     />
                 </div>
+                <div className="mt-4">
+    <InputLabel htmlFor="role" value="Role" />
+
+    <select
+        id="role"
+        name="role"
+        value={data.role}
+        onChange={(e) => setData('role', e.target.value)}
+        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+        required
+    >
+        <option value="company_admin">Company Admin</option>
+        <option value="hr_manager">HR Manager</option>
+        <option value="finance_manager">Finance Manager</option>
+        <option value="department_manager">Department Manager</option>
+        <option value="employee">Employee</option>
+    </select>
+
+    <InputError message={errors.role} className="mt-2" />
+</div>
+<div className="mt-4">
+    <InputLabel htmlFor="tenant_id" value="Tenant ID" />
+
+    <TextInput
+        id="tenant_id"
+        type="text"
+        name="tenant_id"
+        value={data.tenant_id}
+        className="mt-1 block w-full"
+        onChange={(e) => setData('tenant_id', e.target.value)}
+    />
+
+    <InputError message={errors.tenant_id} className="mt-2" />
+</div>
 
                 <div className="mt-4 flex items-center justify-end">
                     <Link
