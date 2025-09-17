@@ -26,9 +26,9 @@ class TenantController extends Controller
             $existingDb = DB::select("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?", [$dbName]);
 
             if (count($existingDb) > 0) {
-                return response()->json([
-                    'message' => "Database '$dbName' already exists. Use a different name.",
-                ], 409);
+                return back()->withErrors([
+                    'database' => "Database '$dbName' already exists. Use a different name.",
+                ]);
             }
 
             // Create new database
@@ -60,25 +60,32 @@ class TenantController extends Controller
             DB::purge('tenant');
             DB::reconnect('tenant');
 
-            // Run all migrations under tenant directory
+            // Run tenant migrations
             Artisan::call('migrate', [
                 '--path' => 'database/migrations/tenant',
                 '--database' => 'tenant',
                 '--force' => true,
             ]);
 
-            return response()->json([
-                'message' => 'Tenant created successfully.',
-                'migration_status' => 'Migrations run successfully.',
-                'tenant' => $tenant
-            ], 201);
+            // ✅ Redirect back with success message (Inertia-friendly)
+            return redirect()->route('tenants.index')->with('success', 'Tenant created successfully!');
         } catch (Exception $e) {
             Log::error('Tenant creation error: ' . $e->getMessage());
 
-            return response()->json([
-                'message' => 'Failed to create tenant.',
-                'error' => $e->getMessage()
-            ], 500);
+            return back()->withErrors([
+                'error' => 'Failed to create tenant. ' . $e->getMessage(),
+            ]);
         }
+    }
+
+    public function index()
+    {
+        // Fetch all tenants
+        $tenants = Tenant::all();
+
+        // Return an Inertia page (or JSON for API)
+        return inertia('SuperAdmin/Tenants/Index', [
+            'tenants' => $tenants,
+        ]);
     }
 }

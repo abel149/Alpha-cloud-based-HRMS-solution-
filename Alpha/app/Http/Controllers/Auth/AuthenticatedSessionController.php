@@ -34,7 +34,10 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = Auth::user(); // Logged-in user from central DB
-
+        if ($user->role === 'Super_admin') {
+            // Super admin goes to central dashboard / tenant management page
+            return redirect()->route('tenants.index');
+        }
         // Store tenant identification info (e.g., tenant_id or domain/subdomain)
         if ($user->tenant_id) {
             session(['tenant_id' => $user->tenant_id]);

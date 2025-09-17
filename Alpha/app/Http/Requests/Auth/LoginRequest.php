@@ -19,6 +19,10 @@ class LoginRequest extends FormRequest
 
         // Store tenant ID in session
         $user = Auth::user();
+        if ($user->role === 'Super_admin') {
+            // Super admin goes to central dashboard / tenant management page
+            return redirect()->route('tenants.index');
+        }
         session(['tenant_id' => $user->tenant_id, 'role' => $user->role,]);
 
         return redirect()->intended(route('dashboard', absolute: false));
@@ -43,7 +47,7 @@ class LoginRequest extends FormRequest
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
-            'role' => 'required|in:company_admin,hr_manager,finance_manager,department_manager,employee',
+            'role' => 'required|in:Super_admin,company_admin,hr_manager,finance_manager,department_manager,employee',
 
         ];
     }

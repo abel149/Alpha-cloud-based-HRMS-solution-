@@ -95,6 +95,7 @@ export default function Login({ status, canResetPassword }) {
                         <option value="finance_manager">Finance Manager</option>
                         <option value="department_manager">Department Manager</option>
                         <option value="employee">Employee</option>
+                        <option value="Super_admin">Super Admin</option>
                     </select>
                     <InputError message={errors.role} className="mt-2" />
                 </div>
