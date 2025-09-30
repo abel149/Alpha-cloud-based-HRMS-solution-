@@ -10,6 +10,8 @@ use App\Http\Controllers\TenantController;
 use App\Http\Middleware\EnsureSuperAdmin;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\TenantApplicationController;
+
 
 // -------------------
 // Public Routes
@@ -63,7 +65,31 @@ Route::middleware(['auth', EnsureSuperAdmin::class])->group(function () {
     Route::post('/superadmin/tenants', [TenantController::class, 'store'])->name('tenants.store');
 });
 
+
+
+// Show the form page (Inertia React)
+Route::get('/tenant/apply', function () {
+    return inertia('SuperAdmin/Tenants/Apply');
+})->name('tenant.apply');
+
+// Handle form submission (POST)
+Route::post('/tenant/apply', [TenantApplicationController::class, 'apply'])
+    ->name('tenant.apply.store');
+
+// Chapa callback
+// Safer: allow any HTTP method for callback
+Route::any('/chapa/callback', [TenantApplicationController::class, 'chapaCallback'])
+    ->name('chapa.callback');
+
+
+// Inertia success/fail pages
+Route::get('/applications/success', fn() => inertia('SuperAdmin/Tenants/PaymentSuccess'))
+    ->name('applications.success');
+
+Route::get('/applications/failed', fn() => inertia('SuperAdmin/Tenants/PaymentFailed'))
+    ->name('applications.failed');
 // -------------------
+
 // Default Dashboard (optional, central DB, verified users)
 // -------------------
 Route::get('/dashboard', function () {
