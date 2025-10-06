@@ -27,7 +27,7 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request)
     {
         $request->authenticate();
 
@@ -41,9 +41,8 @@ class AuthenticatedSessionController extends Controller
         // Store tenant identification info (e.g., tenant_id or domain/subdomain)
         if ($user->tenant_id) {
             session(['tenant_id' => $user->tenant_id]);
+            return redirect()->route('tenant.dashboard');
         }
-
-        return redirect()->intended(route('dashboard', absolute: false));
     }
     /**
      * Destroy an authenticated session.
