@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use App\Models\Tenant;
 use Exception;
+use App\Models\TenantApplication;
+use Inertia\Inertia;
+use App\Models\SubscriptionPlan;
 
 class TenantController extends Controller
 {
@@ -78,14 +81,43 @@ class TenantController extends Controller
         }
     }
 
+
+
     public function index()
     {
-        // Fetch all tenants
+        // Fetch tenants
         $tenants = Tenant::all();
 
-        // Return an Inertia page (or JSON for API)
-        return inertia('SuperAdmin/Tenants/Index', [
+        // Fetch tenant applications that have completed payment
+        $paidApplications = TenantApplication::where('payment_status', 'Paid')->get();
+
+        // Fetch all subscription plans
+        $subscriptionPlans = SubscriptionPlan::all();
+
+        return Inertia::render('SuperAdmin/Tenants/Index', [
             'tenants' => $tenants,
+            'paidApplications' => $paidApplications,
+            'subscriptionPlans' => $subscriptionPlans, // pass it to the frontend
         ]);
+    }
+    public function storeSubscriptionPlan(Request $request)
+    {
+        $request->validate([
+            'planId' => 'required|string|unique:subscription_plans,planId',
+            'name' => 'required|string',
+            'price' => 'required|numeric',
+            'features' => 'required|string',
+            'durationDays' => 'required|integer',
+        ]);
+
+        SubscriptionPlan::create([
+            'planId' => $request->planId,
+            'name' => $request->name,
+            'price' => $request->price,
+            'features' => $request->features,
+            'durationDays' => $request->durationDays,
+        ]);
+
+        return redirect()->back()->with('success', 'Subscription plan created successfully!');
     }
 }

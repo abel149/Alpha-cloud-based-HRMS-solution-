@@ -6,6 +6,8 @@ use App\Models\TenantApplication;
 use App\Services\ChapaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
+use App\Models\SubscriptionPlan;
 
 class TenantApplicationController extends Controller
 {
@@ -91,7 +93,7 @@ class TenantApplicationController extends Controller
             && $result['status'] === 'success'
             && $result['data']['status'] === 'success'
         ) {
-            $application->update(['payment_status' => 'Paid']); // ✅ correct way
+            $application->update(['payment_status' => 'Paid']);
 
             return redirect()->route('applications.success');
         }
