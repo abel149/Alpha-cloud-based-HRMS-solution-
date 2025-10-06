@@ -11,7 +11,7 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\TenantApplicationController;
-
+use App\Http\Controllers\SubscriptionPlanController;
 
 // -------------------
 // Public Routes
@@ -39,22 +39,16 @@ Route::middleware('auth')->group(function () {
 // -------------------
 Route::middleware(['auth', SwitchTenantDatabase::class])->group(function () {
     Route::get('/tenant-dashboard', function () {
-        return Inertia::render('Dashboard'); // Tenant dashboard page
-    })->name('tenant.dashboard');
 
-    Route::get('/tenant-users-json', function () {
-        // Query the users table in the tenant database
-        $users = DB::connection('tenant')->table('users')->get();
+        $users = DB::connection('Tenant')->table('users')->get();
 
-        return response()->json([
-            'tenant_id' => Auth::user()->tenant_id,
-            'connected_db' => DB::connection('tenant')->getDatabaseName(),
+        return Inertia::render('Tenant/Dashboard', [
             'users' => $users,
+            'tenant_db' => DB::connection('Tenant')->getDatabaseName(),
         ]);
-    });
-
-    // Add more tenant-specific routes here
+    })->name('tenant.dashboard');
 });
+
 
 // -------------------
 // Super Admin Routes
@@ -69,7 +63,7 @@ Route::middleware(['auth', EnsureSuperAdmin::class])->group(function () {
 
 // Show the form page (Inertia React)
 Route::get('/tenant/apply', function () {
-    return inertia('SuperAdmin/Tenants/Apply');
+    return inertia('Apply');
 })->name('tenant.apply');
 
 // Handle form submission (POST)
@@ -89,6 +83,15 @@ Route::get('/applications/success', fn() => inertia('SuperAdmin/Tenants/PaymentS
 Route::get('/applications/failed', fn() => inertia('SuperAdmin/Tenants/PaymentFailed'))
     ->name('applications.failed');
 // -------------------
+Route::middleware(['auth'])->prefix('superadmin')->name('subscription-plans.')->group(function () {
+    Route::get('/plans', [SubscriptionPlanController::class, 'index'])->name('index');
+    Route::get('/plans/create', [SubscriptionPlanController::class, 'create'])->name('create');
+    Route::post('/plans', [SubscriptionPlanController::class, 'store'])->name('store');
+});
+//subscription
+Route::post('/subscription-plans', [TenantController::class, 'storeSubscriptionPlan'])
+    ->name('subscription-plans.store')
+    ->middleware(['auth']); // only accessible to logged-in Super Admin
 
 // Default Dashboard (optional, central DB, verified users)
 // -------------------
