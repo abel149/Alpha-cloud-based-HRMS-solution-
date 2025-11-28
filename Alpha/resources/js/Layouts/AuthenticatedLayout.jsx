@@ -5,6 +5,17 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
+
+// Function to generate initials from name
+const getInitials = (name) => {
+    return name
+        .split(' ')
+        .map(part => part[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2);
+};
+
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
 
@@ -40,12 +51,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                         <span className="inline-flex rounded-md">
                                             <button
                                                 type="button"
-                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
+                                                className="flex items-center space-x-2 rounded-full border-2 border-transparent p-1 text-sm transition duration-150 ease-in-out hover:border-gray-200 focus:outline-none"
                                             >
-                                                {user.name}
-
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
+                                                    <span className="text-sm font-medium">{getInitials(user.name)}</span>
+                                                </div>
+                                                <span className="hidden text-sm font-medium text-gray-700 md:block">
+                                                    {user.name}
+                                                </span>
                                                 <svg
-                                                    className="-me-0.5 ms-2 h-4 w-4"
+                                                    className="h-4 w-4 text-gray-500"
                                                     xmlns="http://www.w3.org/2000/svg"
                                                     viewBox="0 0 20 20"
                                                     fill="currentColor"
@@ -137,12 +152,17 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
 
                     <div className="border-t border-gray-200 pb-1 pt-4">
-                        <div className="px-4">
-                            <div className="text-base font-medium text-gray-800">
-                                {user.name}
+                        <div className="flex items-center px-4 py-3">
+                            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white">
+                                <span className="text-sm font-medium">{getInitials(user.name)}</span>
                             </div>
-                            <div className="text-sm font-medium text-gray-500">
-                                {user.email}
+                            <div>
+                                <div className="text-base font-medium text-gray-800">
+                                    {user.name}
+                                </div>
+                                <div className="text-sm font-medium text-gray-500">
+                                    {user.email}
+                                </div>
                             </div>
                         </div>
 
