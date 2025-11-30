@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\SuperAdmin\SuperAdminUserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
@@ -11,6 +12,10 @@ use Exception;
 use App\Models\TenantApplication;
 use Inertia\Inertia;
 use App\Models\SubscriptionPlan;
+use App\Models\SuperAdminUser;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+
 
 class TenantController extends Controller
 {
@@ -93,12 +98,35 @@ class TenantController extends Controller
 
         // Fetch all subscription plans
         $subscriptionPlans = SubscriptionPlan::all();
+        //Fetch users
+        $compadmin = User::all();
 
         return Inertia::render('SuperAdmin/Tenants/Index', [
             'tenants' => $tenants,
             'paidApplications' => $paidApplications,
-            'subscriptionPlans' => $subscriptionPlans, // pass it to the frontend
+            'subscriptionPlans' => $subscriptionPlans,
+            'users' => $compadmin, // pass it to the frontend
         ]);
+    }
+    public function storeuser(Request $request)
+    {
+        $request->validate([
+            'tenantid' => 'integer',
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|confirmed|min:8',
+            'role' => 'required|string',
+        ]);
+
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+            'tenant_id' => $request->tenantid, // stays central
+        ]);
+
+        return back()->with('success', 'User created successfully');
     }
     public function storeSubscriptionPlan(Request $request)
     {

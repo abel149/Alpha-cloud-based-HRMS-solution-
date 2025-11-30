@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 
-export default function Dashboard({ tenants, paidApplications, subscriptionPlans }) {
+export default function Dashboard({ tenants, paidApplications, subscriptionPlans ,users }) {
     const [activeTab, setActiveTab] = useState("tenants");
 
     const [tenantForm, setTenantForm] = useState({
@@ -17,6 +17,14 @@ export default function Dashboard({ tenants, paidApplications, subscriptionPlans
         features: "",
         durationDays: "",
     });
+    const [userForm, setUserForm] = useState({
+    tenantid:"",
+    name: "",
+    email: "",
+    password: "",
+    password_confirmation: "",
+    role: "",
+});
 
     // Handlers
     const handleTenantChange = (e) =>
@@ -34,12 +42,20 @@ export default function Dashboard({ tenants, paidApplications, subscriptionPlans
         e.preventDefault();
         Inertia.post("/subscription-plans", planForm);
     };
+    const handleUserChange = (e) =>
+    setUserForm({ ...userForm, [e.target.name]: e.target.value });
+
+const handleUserSubmit = (e) => {
+    e.preventDefault();
+    Inertia.post("/users", userForm);
+};
 
     // Sidebar tab labels
     const tabs = [
         { key: "tenants", label: "Tenants" },
         { key: "paidApps", label: "Paid Applications" },
         { key: "plans", label: "Subscription Plans" },
+        { key: "users", label: "Super Admin Users" }, 
     ];
 
     return (
@@ -265,6 +281,110 @@ export default function Dashboard({ tenants, paidApplications, subscriptionPlans
                         </table>
                     </div>
                 )}
+                {/* Super Admin Users */}
+{activeTab === "users" && (
+    <div className="space-y-6">
+        <h3 className="text-xl font-semibold mb-2">Super Admin Users</h3>
+
+        {/* User Creation Form */}
+        <form
+            onSubmit={handleUserSubmit}
+            className="space-y-3 bg-white p-4 shadow rounded-lg"
+        >
+            <h4 className="font-semibold">Create New User</h4>
+            <input
+                type="Number"
+                name="tenantid"
+                placeholder="Tenant ID"
+                value={userForm.tenantid}
+                onChange={handleUserChange}
+                className="border p-2 w-full"
+                required
+            />
+            <input
+                type="text"
+                name="name"
+                placeholder="Name"
+                value={userForm.name}
+                onChange={handleUserChange}
+                className="border p-2 w-full"
+                required
+            />
+            <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                value={userForm.email}
+                onChange={handleUserChange}
+                className="border p-2 w-full"
+                required
+            />
+            <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                value={userForm.password}
+                onChange={handleUserChange}
+                className="border p-2 w-full"
+                required
+            />
+            <input
+                type="password"
+                name="password_confirmation"
+                placeholder="Confirm Password"
+                value={userForm.password_confirmation}
+                onChange={handleUserChange}
+                className="border p-2 w-full"
+                required
+            />
+            <input
+                type="text"
+                name="role"
+                placeholder="Role (e.g., Super Admin, Support)"
+                value={userForm.role}
+                onChange={handleUserChange}
+                className="border p-2 w-full"
+                required
+            />
+            <button className="px-4 py-2 bg-blue-600 text-white rounded">
+                Create User
+            </button>
+        </form>
+
+        {/* Users Table */}
+        
+            <table className="w-full border bg-white shadow-sm rounded-lg">
+                <thead className="bg-gray-100">
+                    <tr>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Email</th>
+                        <th className="p-2">Role</th>
+                        <th className="p-2">Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {users.length > 0 ? (
+                        users.map((user) => (
+                            <tr key={user.id}>
+                                <td className="p-2">{user.name}</td>
+                                <td className="p-2">{user.email}</td>
+                                <td className="p-2">{user.role}</td>
+                                <td className="p-2">{user.created_at}</td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan="4" className="p-4 text-center text-gray-500">
+                                No users found.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        
+    </div>
+)}
+
             </main>
         </div>
     );

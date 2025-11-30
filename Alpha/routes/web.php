@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\TenantApplicationController;
 use App\Http\Controllers\SubscriptionPlanController;
+use App\Controllers\SuperAdmin\SuperAdminUserController;
 
 // -------------------
 // Public Routes
@@ -91,6 +92,10 @@ Route::middleware(['auth'])->prefix('superadmin')->name('subscription-plans.')->
 //subscription
 Route::post('/subscription-plans', [TenantController::class, 'storeSubscriptionPlan'])
     ->name('subscription-plans.store')
+    ->middleware(['auth']); // only accessible to logged-in Super Admin
+//create user 
+Route::post('/users', [TenantController::class, 'storeuser'])
+    ->name('users.store')
     ->middleware(['auth']); // only accessible to logged-in Super Admin
 
 // Default Dashboard (optional, central DB, verified users)
