@@ -69,9 +69,9 @@ export default function ApplyTenant() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-12">
+    <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="w-full max-w-6xl">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white sm:text-5xl mb-4">
             Get Started with Our Platform
           </h1>
@@ -80,94 +80,126 @@ export default function ApplyTenant() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden w-full">
           <div className="p-8 sm:p-10">
             <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="space-y-6">
-                {/* Company Name Field */}
-                <div className="relative">
-                  <label htmlFor="company_name" className="block text-sm font-medium text-gray-300 mb-1">
-                    Company Name
-                  </label>
-                  <div className="relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FiBriefcase className="h-5 w-5 text-gray-400" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Column - Company Info */}
+                <div className="space-y-6">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Company Information</h3>
+                  
+                  {/* Company Name Field */}
+                  <div className="relative">
+                    <label htmlFor="company_name" className="block text-sm font-medium text-gray-300 mb-1">
+                      Company Name
+                    </label>
+                    <div className="relative rounded-md shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FiBriefcase className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="company_name"
+                        name="company_name"
+                        value={form.company_name}
+                        onChange={handleChange}
+                        className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                        placeholder="Acme Inc."
+                        required
+                      />
                     </div>
-                    <input
-                      type="text"
-                      id="company_name"
-                      name="company_name"
-                      value={form.company_name}
-                      onChange={handleChange}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
-                      placeholder="Acme Inc."
-                      required
-                    />
+                  </div>
+
+                  {/* Email Field */}
+                  <div className="relative">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                      Business Email
+                    </label>
+                    <div className="relative rounded-md shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FiMail className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={form.email}
+                        onChange={handleChange}
+                        className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                        placeholder="you@company.com"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Email Field */}
-                <div className="relative">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
-                    Business Email
-                  </label>
-                  <div className="relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FiMail className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
-                      placeholder="you@company.com"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Plan Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Choose Your Plan
-                  </label>
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-                    {[
-                      { id: 'basic', name: 'Basic', price: '$29', features: ['Up to 10 employees', 'Basic features'], recommended: false },
-                      { id: 'pro', name: 'Professional', price: '$99', features: ['Up to 50 employees', 'Advanced features'], recommended: true },
-                      { id: 'enterprise', name: 'Enterprise', price: 'Custom', features: ['Unlimited employees', 'All features', 'Dedicated support'] }
-                    ].map((plan) => (
+                {/* Right Column - Plan Selection */}
+                <div className="lg:border-l lg:border-gray-200 dark:lg:border-gray-700 lg:pl-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Choose Your Plan</h3>
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {[
+                        { id: 'basic', name: 'Basic', price: '$29', features: ['Up to 10 employees', 'Basic features'], recommended: false },
+                        { id: 'pro', name: 'Professional', price: '$99', features: ['Up to 50 employees', 'Advanced features'], recommended: true }
+                      ].map((plan) => (
                       <div 
                         key={plan.id}
-                        className={`relative border rounded-xl p-6 cursor-pointer transition-all duration-200 ${
+                        className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
                           form.plan === plan.id 
-                            ? 'ring-2 ring-blue-500 border-transparent bg-blue-50 dark:bg-blue-900/20' 
+                            ? 'ring-1 ring-blue-500 border-transparent bg-blue-50 dark:bg-blue-900/20' 
                             : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                        } ${plan.recommended ? 'ring-2 ring-blue-500' : ''}`}
+                        } ${plan.recommended ? 'ring-1 ring-blue-500' : ''}`}
                         onClick={() => setForm({...form, plan: plan.id})}
                       >
                         {plan.recommended && (
-                          <span className="absolute -top-2 right-4 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                          <span className="absolute -top-2 right-3 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
                             Recommended
                           </span>
                         )}
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{plan.name}</h3>
-                        <div className="mt-2">
-                          <span className="text-2xl font-bold text-gray-900 dark:text-white">{plan.price}</span>
-                          {plan.price !== 'Custom' && <span className="text-gray-500 dark:text-gray-400">/month</span>}
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-base font-medium text-gray-900 dark:text-white">{plan.name}</h4>
+                          <span className="text-base font-bold text-blue-600 dark:text-blue-400">
+                            {plan.price}
+                            {plan.price !== 'Custom' && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/month</span>}
+                          </span>
                         </div>
-                        <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                          {plan.features.map((feature, index) => (
-                            <li key={index} className="flex items-center">
-                              <FiCheckCircle className="h-4 w-4 text-blue-500 mr-2" />
-                              <span className="text-gray-600 dark:text-gray-300">{feature}</span>
+                        <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+                          {plan.features.map((feature, i) => (
+                            <li key={i} className="flex items-start">
+                              <FiCheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 mr-1.5 flex-shrink-0" />
+                              <span>{feature}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
-                    ))}
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1">
+                      <div 
+                        key="enterprise"
+                        className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
+                          form.plan === 'enterprise' 
+                            ? 'ring-1 ring-blue-500 border-transparent bg-blue-50 dark:bg-blue-900/20' 
+                            : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                        }`}
+                        onClick={() => setForm({...form, plan: 'enterprise'})}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-base font-medium text-gray-900 dark:text-white">Enterprise</h4>
+                          <span className="text-base font-bold text-blue-600 dark:text-blue-400">
+                            Custom
+                          </span>
+                        </div>
+                        <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+                          {['Unlimited employees', 'All features', 'Dedicated support'].map((feature, i) => (
+                            <li key={i} className="flex items-start">
+                              <FiCheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 mr-1.5 flex-shrink-0" />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

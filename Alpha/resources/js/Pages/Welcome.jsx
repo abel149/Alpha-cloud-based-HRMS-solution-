@@ -78,351 +78,70 @@ const testimonials = [
 
 function LoginForm({ onClose }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        tenant_id: '',   
-        email: '',
+        tenant_id: localStorage.getItem('login_tenant') || '',   
+        email: localStorage.getItem('login_email') || '',
         password: '',
-        role: 'employee',
-        remember: false,
+        role: localStorage.getItem('login_role') || 'employee',
+        remember: localStorage.getItem('login_remember') === 'true' || false,
     });
+
+    // Save form data to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('login_tenant', data.tenant_id);
+        localStorage.setItem('login_email', data.email);
+        localStorage.setItem('login_role', data.role);
+        localStorage.setItem('login_remember', data.remember);
+    }, [data]);
 
     const submit = (e) => {
         e.preventDefault();
+        
         post(route('login'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Clear saved login data on successful login
+                localStorage.removeItem('login_tenant');
+                localStorage.removeItem('login_email');
+                localStorage.removeItem('login_role');
+                localStorage.removeItem('login_remember');
+                onClose?.();
+            },
+            onError: (errors) => {
+                // Keep the modal open on validation errors
+                window.history.pushState({}, '', window.location.pathname + '?modal=login');
+            },
             onFinish: () => reset('password'),
         });
     };
-
-    return (
-        <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-            <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-                <p className="mt-2 text-sm text-gray-600">Sign in to your account to continue</p>
-            </div>
-
-            <form onSubmit={submit} className="space-y-6">
-                <div>
-                    <InputLabel htmlFor="email" value="Email address" />
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <FiMail className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <TextInput
-                            id="email"
-                            type="email"
-                            name="email"
-                            value={data.email}
-                            className="block w-full pl-10"
-                            autoComplete="email"
-                            onChange={(e) => setData('email', e.target.value)}
-                            required
-                        />
-                    </div>
-                    <InputError message={errors.email} className="mt-1" />
-                </div>
-
-                <div>
-                    <div className="flex items-center justify-between">
-                        <InputLabel htmlFor="password" value="Password" />
-                        <Link
-                            href={route('password.request')}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-500"
-                        >
-                            Forgot password?
-                        </Link>
-                    </div>
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <FiLock className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <TextInput
-                            id="password"
-                            type="password"
-                            name="password"
-                            value={data.password}
-                            className="block w-full pl-10"
-                            autoComplete="current-password"
-                            onChange={(e) => setData('password', e.target.value)}
-                            required
-                        />
-                    </div>
-                    <InputError message={errors.password} className="mt-1" />
-                </div>
-
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                        <Checkbox
-                            name="remember"
-                            checked={data.remember}
-                            onChange={(e) => setData('remember', e.target.checked)}
-                        />
-                        <label htmlFor="remember" className="ml-2 block text-sm text-gray-900">
-                            Remember me
-                        </label>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <PrimaryButton
-                        type="submit"
-                        className="w-full justify-center"
-                        disabled={processing}
-                    >
-                        {processing ? 'Signing in...' : 'Sign in'}
-                    </PrimaryButton>
-                    
-                    <div className="text-center text-sm text-gray-600">
-                        Don't have an account?{' '}
-                        <Link 
-                            href={route('register')} 
-                            className="font-medium text-blue-600 hover:text-blue-500"
-                            onClick={onClose}
-                        >
-                            Sign up
-                        </Link>
-                    </div>
-                </div>
-            </form>
-        </div>
-    );
 }
-
-function RegisterForm({ onClose }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-        role: 'employee',
-        tenant_id: '',
-        terms: false,
-    });
-    
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
- const submit = (e) => {
-        e.preventDefault();
-        post(route('register'), {
-            onFinish: () => reset('password', 'password_confirmation'),
-        });
-    };
-
-    return (
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-2xl">
-            <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Create an Account</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">Join us today and get started</p>
-            </div>
-
-            <form onSubmit={submit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Left Column */}
-                    <div className="space-y-4">
-                        <div>
-                            <InputLabel htmlFor="name" value="Name" className="text-sm font-medium text-gray-700 dark:text-gray-300" />
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FiUser className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <TextInput
-                                    id="name"
-                                    type="text"
-                                    name="name"
-                                    value={data.name}
-                                    className="block w-full pl-10"
-                                    autoComplete="name"
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <InputError message={errors.name} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="email" value="Email" className="text-sm font-medium text-gray-700 dark:text-gray-300" />
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FiMail className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <TextInput
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    value={data.email}
-                                    className="block w-full pl-10"
-                                    autoComplete="email"
-                                    onChange={(e) => setData('email', e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <InputError message={errors.email} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="tenant_id" value="Tenant ID" className="text-sm font-medium text-gray-700 dark:text-gray-300" />
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <TextInput
-                                    id="tenant_id"
-                                    type="text"
-                                    name="tenant_id"
-                                    value={data.tenant_id}
-                                    className="block w-full"
-                                    onChange={(e) => setData('tenant_id', e.target.value)}
-                                />
-                            </div>
-                            <InputError message={errors.tenant_id} className="mt-1" />
-                        </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="space-y-4">
-                        <div>
-                            <InputLabel htmlFor="password" value="Password" className="text-sm font-medium text-gray-700 dark:text-gray-300" />
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FiLock className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <TextInput
-                                    id="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    name="password"
-                                    value={data.password}
-                                    className="block w-full pl-10"
-                                    autoComplete="new-password"
-                                    onChange={(e) => setData('password', e.target.value)}
-                                    required
-                                />
-                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                                    <button
-                                        type="button"
-                                        className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                    >
-                                        {showPassword ? (
-                                            <FiEyeOff className="h-5 w-5" />
-                                        ) : (
-                                            <FiEye className="h-5 w-5" />
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                            <InputError message={errors.password} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="password_confirmation" value="Confirm Password" className="text-sm font-medium text-gray-700 dark:text-gray-300" />
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <FiLock className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <TextInput
-                                    id="password_confirmation"
-                                    type={showConfirmPassword ? 'text' : 'password'}
-                                    name="password_confirmation"
-                                    value={data.password_confirmation}
-                                    className="block w-full pl-10"
-                                    autoComplete="new-password"
-                                    onChange={(e) => setData('password_confirmation', e.target.value)}
-                                    required
-                                />
-                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                                    <button
-                                        type="button"
-                                        className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    >
-                                        {showConfirmPassword ? (
-                                            <FiEyeOff className="h-5 w-5" />
-                                        ) : (
-                                            <FiEye className="h-5 w-5" />
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                            <InputError message={errors.password_confirmation} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="role" value="Role" className="text-sm font-medium text-gray-700 dark:text-gray-300" />
-                            <div className="mt-1">
-                                <select
-                                    id="role"
-                                    name="role"
-                                    value={data.role}
-                                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                    onChange={(e) => setData('role', e.target.value)}
-                                    required
-                                >
-                                    <option value="company_admin">Company Admin</option>
-                                    <option value="hr_manager">HR Manager</option>
-                                    <option value="employee">Employee</option>
-                                </select>
-                            </div>
-                            <InputError message={errors.role} className="mt-1" />
-                        </div>
-                        
-                        <div className="flex items-start pt-2">
-                            <div className="flex items-center h-5">
-                                <Checkbox
-                                    name="terms"
-                                    checked={data.terms}
-                                    onChange={(e) => setData('terms', e.target.checked)}
-                                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                    required
-                                />
-                            </div>
-                            <div className="ml-3 text-sm">
-                                <label htmlFor="terms" className="text-gray-700 dark:text-gray-300">
-                                    I agree to the <a href="#" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">terms and conditions</a>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="pt-2">
-                    <button
-                        type="submit"
-                        disabled={processing}
-                        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                    >
-                        {processing ? 'Creating Account...' : 'Create Account'}
-                    </button>
-                </div>
-            </form>
-
-            <div className="mt-4 text-center text-sm">
-                <p className="text-gray-600 dark:text-gray-400">
-                    Already have an account?{' '}
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            onClose();
-                            window.history.pushState({}, '', route('login'));
-                            window.dispatchEvent(new Event('popstate'));
-                        }}
-                        className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                        Sign in
-                    </button>
-                </p>
-            </div>
-        </div>
-    );
-}
-
-export default function Welcome({ auth }) {
-    const [isLoginOpen, setIsLoginOpen] = useState(window.location.pathname === '/login');
-    const [isRegisterOpen, setIsRegisterOpen] = useState(window.location.pathname === '/register');
+export default function Welcome({ auth, errors: serverErrors = {} }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     
-    // Handle browser back/forward buttons and modal state
+    // Check URL for modal state on initial load
+    const [activeModal, setActiveModal] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('modal') || '';
+    });
+    
+    // Update URL when modal state changes
+    const setModal = (modalName) => {
+        const url = new URL(window.location);
+        if (modalName) {
+            url.searchParams.set('modal', modalName);
+        } else {
+            url.searchParams.delete('modal');
+        }
+        window.history.pushState({}, '', url);
+        setActiveModal(modalName);
+    };
+    
+    // Handle browser back/forward navigation
     useEffect(() => {
         const handlePopState = () => {
-            const isLoginPath = window.location.pathname === '/login';
-            setIsLoginOpen(isLoginPath);
+            const params = new URLSearchParams(window.location.search);
+            setActiveModal(params.get('modal') || '');
         };
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
@@ -430,13 +149,11 @@ export default function Welcome({ auth }) {
 
     const openLoginModal = (e) => {
         if (e) e.preventDefault();
-        window.history.pushState({}, '', route('login'));
-        setIsLoginOpen(true);
+        setModal('login');
     };
 
     const closeLoginModal = () => {
-        window.history.pushState({}, '', route('welcome'));
-        setIsLoginOpen(false);
+        setModal('');
     };
     
     // Login form state
@@ -452,7 +169,7 @@ export default function Welcome({ auth }) {
         e.preventDefault();
         post(route('login'), {
             onFinish: () => reset('password'),
-            onSuccess: () => setIsLoginOpen(false)
+            onSuccess: () => closeLoginModal()
         });
     };
 
@@ -469,9 +186,9 @@ export default function Welcome({ auth }) {
         document.documentElement.classList.toggle('dark');
     };
     return (
-        <div className={`min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all duration-300 ${isLoginOpen ? 'overflow-hidden' : ''} relative`}>
+        <div className={`min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all duration-300 ${activeModal === 'login' ? 'overflow-hidden' : ''} relative`}>
             {/* Blur overlay for main content */}
-            {isLoginOpen && (
+            {activeModal === 'login' && (
                 <div 
                     className="fixed inset-0 bg-black/30 backdrop-blur-sm z-30 transition-opacity duration-300"
                     onClick={closeLoginModal}
@@ -480,7 +197,7 @@ export default function Welcome({ auth }) {
 
 
             {/* Login Modal */}
-            {isLoginOpen && (
+            {activeModal === 'login' && (
                 <div 
                     className="fixed inset-0 z-50 flex items-center justify-center p-4"
                     onClick={(e) => {
@@ -490,7 +207,7 @@ export default function Welcome({ auth }) {
                     }}
                 >
                     <div 
-                        className="relative w-full max-w-md transform transition-all"
+                        className="w-full max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-300"
                         onClick={(e) => e.stopPropagation()} // Prevent click from closing when clicking inside modal
                     >
                        
@@ -501,11 +218,11 @@ export default function Welcome({ auth }) {
 
 
 
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden ">
                             <div className="p-8">
                                 <div className="text-center mb-8">
-                                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome Back</h2>
-                                    <p className="mt-2 text-gray-600 dark:text-gray-300">Sign in to your account</p>
+                                    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Welcome Back</h2>
+                                    <p className="mt-2 text-gray-600 dark:text-gray-300 text-base md:text-lg">Sign in to your account</p>
                                 </div>
 
                                <form onSubmit={submit} className="space-y-6">
@@ -616,16 +333,7 @@ export default function Welcome({ auth }) {
 
     {/* Buttons */}
     <div className="pt-2 flex space-x-4">
-        <button
-            type="button"
-            onClick={() => {
-                
-                Inertia.visit(route('welcome'));
-            }}
-            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600"
-        >
-            Cancel
-        </button>
+       
         <button
             type="submit"
             disabled={processing}
@@ -639,17 +347,12 @@ export default function Welcome({ auth }) {
                                 <div className="mt-6 text-center text-sm">
                                     <p className="text-gray-600 dark:text-gray-400">
                                         Don't have an account?{' '}
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                onClose();
-                                                Inertia.get(route('apply'));
-                                            }}
+                                        <Link
+                                            href={route('tenant.apply')}
                                             className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
                                         >
                                             Sign up
-                                        </button>
+                                        </Link>
                                     </p>
                                 </div>
                             </div>
