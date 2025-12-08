@@ -1,5 +1,5 @@
 import { Head, Link, useForm, router as Inertia } from '@inertiajs/react';
-import { FiArrowRight, FiCheckCircle, FiMenu, FiX, FiMoon, FiSun, FiLock, FiMail, FiUser, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiArrowRight, FiCheckCircle, FiMenu, FiX, FiMoon, FiSun, FiLock, FiMail, FiUser, FiEye, FiEyeOff, FiLogIn, FiBriefcase } from 'react-icons/fi';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import InputError from '@/Components/InputError';
@@ -212,7 +212,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                     >
                        
 
-                        <button onClick={closeLoginModal} className="absolute -right-2 -top-2 z-10 rounded-full bg-white dark:bg-gray-700 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none transition-colors duration-200">
+                        <button onClick={closeLoginModal} className="absolute right-3 top-3 z-10 rounded-full bg-white dark:bg-gray-700 p-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none transition-colors duration-200">
                             <FiX className="h-6 w-6" />
                         </button>
 
@@ -235,15 +235,20 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                     value="Tenant ID" 
                     className="text-sm font-medium text-gray-700 dark:text-gray-300" 
                 />
+                 <div className="relative">
+                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                        <FiBriefcase />
+                    </span>
                 <TextInput
                     id="tenant_id"
                     type="text"
                     name="tenant_id"
                     value={data.tenant_id}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
                     autoComplete="off"
                     onChange={(e) => setData('tenant_id', e.target.value)}
                 />
+                </div>
                 <InputError message={errors.tenant_id} className="mt-1 text-sm text-red-600 dark:text-red-400" />
             </div>
 
@@ -253,15 +258,21 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                     value="Email" 
                     className="text-sm font-medium text-gray-700 dark:text-gray-300" 
                 />
+                   <div className="relative">
+                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                        <FiUser />
+                    </span>
                 <TextInput
                     id="email"
                     type="email"
                     name="email"
                     value={data.email}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                    placeholder="your@email.com"
                     autoComplete="username"
                     onChange={(e) => setData('email', e.target.value)}
                 />
+                </div>
                 <InputError message={errors.email} className="mt-1 text-sm text-red-600 dark:text-red-400" />
             </div>
         </div>
@@ -274,15 +285,21 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                     value="Password" 
                     className="text-sm font-medium text-gray-700 dark:text-gray-300" 
                 />
-                <TextInput
-                    id="password"
-                    type="password"
-                    name="password"
-                    value={data.password}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    autoComplete="current-password"
-                    onChange={(e) => setData('password', e.target.value)}
-                />
+                <div className="relative">
+                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                        <FiLock />
+                    </span>
+                    <TextInput
+                        id="password"
+                        type="password"
+                        name="password"
+                        value={data.password}
+                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        onChange={(e) => setData('password', e.target.value)}
+                    />
+                </div>
                 <InputError message={errors.password} className="mt-1 text-sm text-red-600 dark:text-red-400" />
             </div>
 
@@ -337,8 +354,9 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
         <button
             type="submit"
             disabled={processing}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
         >
+            <FiLogIn className="w-4 h-4 mr-2" />
             {processing ? 'Signing in...' : 'Sign in'}
         </button>
     </div>
@@ -390,8 +408,9 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                             </button>
                             <button
                                 onClick={openLoginModal}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition flex items-center justify-center"
                             >
+                                <FiLogIn className="w-4 h-4 mr-2" />
                                 Sign In
                             </button>
                              
@@ -437,6 +456,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                 className="block py-2 px-4 text-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
                                 onClick={() => setIsMenuOpen(false)}
                             >
+                                
                                 Sign In
                             </Link>
                         </motion.div>
@@ -494,8 +514,9 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             <Link
                                 href={route('tenant.apply')}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg text-lg font-medium transition transform hover:scale-105 cursor-pointer"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg text-lg font-medium transition transform hover:scale-105 cursor-pointer flex items-center justify-center"
                             >
+                                <FiLogIn className="w-5 h-5 mr-2" />
                                 Get Started Free
                             </Link>
                             <a
