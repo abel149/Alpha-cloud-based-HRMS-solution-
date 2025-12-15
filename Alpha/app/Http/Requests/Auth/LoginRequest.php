@@ -46,9 +46,7 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
-            'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
-            'role' => 'required|in:Super_admin,company_admin,hr_manager,finance_manager,department_manager,employee',
-
+            'tenant_id' => ['required', 'string', 'exists:tenants,database'],
         ];
     }
 
@@ -59,20 +57,32 @@ class LoginRequest extends FormRequest
      */
     public function authenticate(): void
     {
-        $credentials = $this->only('email', 'password', 'tenant_id');
+        // Get tenant by database
+        $tenant = \App\Models\Tenant::where('database', $this->tenant_id)->first();
+        
+        if (! $tenant) {
+            throw ValidationException::withMessages([
+                'tenant_id' => 'Invalid tenant selected.',
+            ]);
+        }
 
-        // First, find the user with email, tenant, and role
-        $user = \App\Models\User::where('email', $this->email)
-            ->where('tenant_id', $this->tenant_id)
-            ->where('role', $this->role)
-            ->first();
+        // Find user by email in central database
+        $user = \App\Models\User::where('email', $this->email)->first();
 
         if (! $user || ! Auth::attempt(
-            ['email' => $this->email, 'password' => $this->password, 'tenant_id' => $this->tenant_id, 'role' => $this->role],
+            ['email' => $this->email, 'password' => $this->password],
             $this->boolean('remember')
         )) {
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
+            ]);
+        }
+
+        // Check if user belongs to selected tenant
+        if ($user->tenant_id !== $tenant->id) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => 'This account does not belong to the selected tenant.',
             ]);
         }
     }

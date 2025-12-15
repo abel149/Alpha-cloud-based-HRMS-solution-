@@ -78,10 +78,8 @@ const testimonials = [
 
 function LoginForm({ onClose }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        tenant_id: '',   
         email: '',
         password: '',
-        role: 'employee',
         remember: false,
     });
 
@@ -100,6 +98,25 @@ function LoginForm({ onClose }) {
             </div>
 
             <form onSubmit={submit} className="space-y-6">
+                <div>
+                    <InputLabel htmlFor="tenant_id" value="Select Your Company" />
+                    <select
+                        id="tenant_id"
+                        name="tenant_id"
+                        value={data.tenant_id}
+                        onChange={(e) => setData('tenant_id', e.target.value)}
+                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        required
+                    >
+                        <option value="">Choose your company...</option>
+                        <option value="tenant_company101">Company 101</option>
+                        <option value="booked">Booked Company</option>
+                        <option value="mnbjsb">MNB JSB</option>
+                        <option value="tenant_company102">Company 102</option>
+                    </select>
+                    <InputError message={errors.tenant_id} className="mt-1" />
+                </div>
+
                 <div>
                     <InputLabel htmlFor="email" value="Email address" />
                     <div className="mt-1 relative rounded-md shadow-sm">
@@ -398,7 +415,7 @@ function RegisterForm({ onClose }) {
                         onClick={(e) => {
                             e.preventDefault();
                             onClose();
-                            window.history.pushState({}, '', route('login'));
+                            window.history.pushState({}, '', route('welcome'));
                             window.dispatchEvent(new Event('popstate'));
                         }}
                         className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
@@ -430,7 +447,7 @@ export default function Welcome({ auth }) {
 
     const openLoginModal = (e) => {
         if (e) e.preventDefault();
-        window.history.pushState({}, '', route('login'));
+        window.history.pushState({}, '', route('welcome'));
         setIsLoginOpen(true);
     };
 
@@ -444,7 +461,6 @@ export default function Welcome({ auth }) {
         tenant_id: '',
         email: '',
         password: '',
-        role: 'employee',
         remember: false,
     });
 
@@ -452,7 +468,10 @@ export default function Welcome({ auth }) {
         e.preventDefault();
         post(route('login'), {
             onFinish: () => reset('password'),
-            onSuccess: () => setIsLoginOpen(false)
+            onSuccess: () => {
+                setIsLoginOpen(false);
+                // Let Inertia handle the redirect automatically
+            }
         });
     };
 
@@ -729,13 +748,16 @@ export default function Welcome({ auth }) {
                                     {link.name}
                                 </a>
                             ))}
-                            <Link
-                                href={route('login')}
-                                className="block py-2 px-4 text-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
-                                onClick={() => setIsMenuOpen(false)}
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setIsMenuOpen(false);
+                                    openLoginModal();
+                                }}
+                                className="block py-2 px-4 text-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition w-full"
                             >
                                 Sign In
-                            </Link>
+                            </button>
                         </motion.div>
                     )}
                 </nav>

@@ -8,11 +8,13 @@ use Inertia\Inertia;
 use App\Http\Middleware\SwitchTenantDatabase;
 use App\Http\Controllers\TenantController;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureCompanyAdmin;
+use App\Http\Controllers\CompanyAdminController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\TenantApplicationController;
 use App\Http\Controllers\SubscriptionPlanController;
-use App\Controllers\SuperAdmin\SuperAdminUserController;
+use App\Http\Controllers\SuperAdmin\SuperAdminUserController;
 
 // -------------------
 // Public Routes
@@ -24,7 +26,7 @@ Route::get('/', function () {
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
-});
+})->name('welcome');
 
 // -------------------
 // Authenticated User Routes (Central DB)
@@ -60,7 +62,28 @@ Route::middleware(['auth', EnsureSuperAdmin::class])->group(function () {
     Route::post('/superadmin/tenants', [TenantController::class, 'store'])->name('tenants.store');
 });
 
-
+// -------------------
+// Company Admin Routes (Tenant-specific)
+// -------------------
+Route::middleware(['auth', SwitchTenantDatabase::class, EnsureCompanyAdmin::class])->prefix('company-admin')->name('company-admin.')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [CompanyAdminController::class, 'index'])->name('dashboard');
+    
+    // Employee Management
+    Route::post('/employees', [CompanyAdminController::class, 'storeEmployee'])->name('employees.store');
+    
+    // Department Management
+    Route::post('/departments', [CompanyAdminController::class, 'storeDepartment'])->name('departments.store');
+    
+    // Leave Policy Management
+    Route::post('/leave-policies', [CompanyAdminController::class, 'storeLeavePolicy'])->name('leave-policies.store');
+    
+    // Attendance Policy Management
+    Route::post('/attendance-policies', [CompanyAdminController::class, 'storeAttendancePolicy'])->name('attendance-policies.store');
+    
+    // Role Management (RBAC)
+    Route::post('/roles', [CompanyAdminController::class, 'storeRole'])->name('roles.store');
+});
 
 // Show the form page (Inertia React)
 Route::get('/tenant/apply', function () {
@@ -98,10 +121,26 @@ Route::post('/users', [TenantController::class, 'storeuser'])
     ->name('users.store')
     ->middleware(['auth']); // only accessible to logged-in Super Admin
 
-// Default Dashboard (optional, central DB, verified users)
+// Default Dashboard - Role-based redirect (NO OLD DASHBOARD PAGE)
 // -------------------
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard'); // This can be central DB dashboard if needed
+    $user = Auth::user();
+    
+    // Redirect based on user role
+    if ($user->role === 'Super_admin') {
+        return redirect()->route('tenants.index');
+    }
+    
+    if ($user->role === 'company_admin' && $user->tenant_id) {
+        return redirect()->route('company-admin.dashboard');
+    }
+    
+    if ($user->tenant_id) {
+        return redirect()->route('tenant.dashboard');
+    }
+    
+    // No dashboard access - redirect to home
+    return redirect('/');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 require __DIR__ . '/auth.php';

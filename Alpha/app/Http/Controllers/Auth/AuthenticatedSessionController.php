@@ -34,15 +34,35 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = Auth::user(); // Logged-in user from central DB
+        
+        // Super Admin - redirect to tenant management
         if ($user->role === 'Super_admin') {
-            // Super admin goes to central dashboard / tenant management page
             return redirect()->route('tenants.index');
         }
-        // Store tenant identification info (e.g., tenant_id or domain/subdomain)
+        
+        // Company Admin - redirect to company admin dashboard
+        if ($user->role === 'company_admin') {
+            if (!$user->tenant_id) {
+                Auth::logout();
+                return redirect()->route('login')->withErrors([
+                    'email' => 'Your account is not assigned to a tenant. Please contact the administrator.',
+                ]);
+            }
+            session(['tenant_id' => $user->tenant_id]);
+            return redirect()->route('company-admin.dashboard');
+        }
+        
+        // Other tenant users - redirect to tenant dashboard
         if ($user->tenant_id) {
             session(['tenant_id' => $user->tenant_id]);
             return redirect()->route('tenant.dashboard');
         }
+        
+        // No valid tenant - logout and show error
+        Auth::logout();
+        return redirect()->route('login')->withErrors([
+            'email' => 'Your account is not properly configured. Please contact the administrator.',
+        ]);
     }
     /**
      * Destroy an authenticated session.

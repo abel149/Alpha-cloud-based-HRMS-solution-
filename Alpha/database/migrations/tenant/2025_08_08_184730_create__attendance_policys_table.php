@@ -11,8 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('_attendance_policys', function (Blueprint $table) {
+        Schema::create('attendance_policies', function (Blueprint $table) {
             $table->id();
+            $table->string('policy_name');
+            $table->time('work_start_time'); // e.g., 09:00:00
+            $table->time('work_end_time'); // e.g., 17:00:00
+            $table->integer('grace_period_minutes')->default(15);
+            $table->integer('late_penalty_minutes')->nullable();
+            $table->boolean('requires_check_in')->default(true);
+            $table->boolean('requires_check_out')->default(true);
+            $table->integer('minimum_work_hours')->default(8);
+            $table->text('description')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }
@@ -22,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('_attendance_policys');
+        Schema::dropIfExists('attendance_policies');
     }
 };

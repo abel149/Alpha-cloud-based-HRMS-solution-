@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\SuperAdmin\SuperAdminUserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
@@ -12,7 +11,6 @@ use Exception;
 use App\Models\TenantApplication;
 use Inertia\Inertia;
 use App\Models\SubscriptionPlan;
-use App\Models\SuperAdminUser;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
@@ -50,7 +48,7 @@ class TenantController extends Controller
             ]);
 
             // Set tenant DB config dynamically
-            config(['database.connections.tenant' => [
+            config(['database.connections.Tenant' => [
                 'driver' => 'mysql',
                 'host' => env('DB_HOST', '127.0.0.1'),
                 'port' => env('DB_PORT', '3306'),
@@ -65,13 +63,13 @@ class TenantController extends Controller
             ]]);
 
             // Reconnect with the new tenant connection
-            DB::purge('tenant');
-            DB::reconnect('tenant');
+            DB::purge('Tenant');
+            DB::reconnect('Tenant');
 
             // Run tenant migrations
             Artisan::call('migrate', [
                 '--path' => 'database/migrations/tenant',
-                '--database' => 'tenant',
+                '--database' => 'Tenant',
                 '--force' => true,
             ]);
 
@@ -106,6 +104,16 @@ class TenantController extends Controller
             'paidApplications' => $paidApplications,
             'subscriptionPlans' => $subscriptionPlans,
             'users' => $compadmin, // pass it to the frontend
+        ]);
+    }
+
+    public function create()
+    {
+        // Fetch subscription plans for the create form
+        $subscriptionPlans = SubscriptionPlan::all();
+        
+        return Inertia::render('SuperAdmin/Tenants/Create', [
+            'subscriptionPlans' => $subscriptionPlans,
         ]);
     }
     public function storeuser(Request $request)

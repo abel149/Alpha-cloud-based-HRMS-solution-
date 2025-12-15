@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
+import { usePage } from '@inertiajs/react';
 import { FiUsers, FiFileText, FiCreditCard, FiPlus, FiChevronRight, FiLogOut, FiUser, FiSettings, FiChevronDown, FiX } from 'react-icons/fi';
 
 export default function Dashboard({ tenants, paidApplications, subscriptionPlans ,users }) {
@@ -11,6 +12,7 @@ export default function Dashboard({ tenants, paidApplications, subscriptionPlans
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   
     // Get authenticated user data from Inertia props
+    const { auth } = usePage().props;
     const { user } = auth;
 
     // Function to get user initials
@@ -505,6 +507,143 @@ const handleUserSubmit = (e) => {
                             )}
                         </div>
                     )}
+
+                    {/* Super Admin Users Tab */}
+                    {activeTab === "users" && (
+                        <div className="space-y-6">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-bold">Super Admin Users</h2>
+                                    <p className="text-gray-600 dark:text-gray-400">Manage platform users</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                <h3 className="text-lg font-semibold mb-4">Create New User</h3>
+                                <form onSubmit={handleUserSubmit} className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tenant ID</label>
+                                            <input
+                                                type="number"
+                                                name="tenantid"
+                                                placeholder="Tenant ID"
+                                                value={userForm.tenantid}
+                                                onChange={handleUserChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                                            <input
+                                                type="text"
+                                                name="name"
+                                                placeholder="Full name"
+                                                value={userForm.name}
+                                                onChange={handleUserChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                placeholder="email@example.com"
+                                                value={userForm.email}
+                                                onChange={handleUserChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                                            <input
+                                                type="text"
+                                                name="role"
+                                                placeholder="e.g., Super_admin, company_admin"
+                                                value={userForm.role}
+                                                onChange={handleUserChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                                            <input
+                                                type="password"
+                                                name="password"
+                                                placeholder="••••••••"
+                                                value={userForm.password}
+                                                onChange={handleUserChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm Password</label>
+                                            <input
+                                                type="password"
+                                                name="password_confirmation"
+                                                placeholder="••••••••"
+                                                value={userForm.password_confirmation}
+                                                onChange={handleUserChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end pt-2">
+                                        <button
+                                            type="submit"
+                                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                        >
+                                            <FiPlus className="mr-2" />
+                                            Create User
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead className="bg-gray-50 dark:bg-gray-700/50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                            {users.length > 0 ? (
+                                                users.map((user) => (
+                                                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{user.name}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.role}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.created_at}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="4" className="px-6 py-12 text-center">
+                                                        <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
+                                                            <FiUsers className="h-12 w-12 opacity-30" />
+                                                            <p className="text-lg font-medium">No users found</p>
+                                                            <p className="text-sm">Create your first user to get started</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
             
@@ -579,109 +718,8 @@ const handleUserSubmit = (e) => {
                             </div>
                         </div>
                     </div>
-
-                );
-                {/* Super Admin Users */}
-{activeTab === "users" && (
-    <div className="space-y-6">
-        <h3 className="text-xl font-semibold mb-2">Super Admin Users</h3>
-
-        {/* User Creation Form */}
-        <form
-            onSubmit={handleUserSubmit}
-            className="space-y-3 bg-white p-4 shadow rounded-lg"
-        >
-            <h4 className="font-semibold">Create New User</h4>
-            <input
-                type="Number"
-                name="tenantid"
-                placeholder="Tenant ID"
-                value={userForm.tenantid}
-                onChange={handleUserChange}
-                className="border p-2 w-full"
-                required
-            />
-            <input
-                type="text"
-                name="name"
-                placeholder="Name"
-                value={userForm.name}
-                onChange={handleUserChange}
-                className="border p-2 w-full"
-                required
-            />
-            <input
-                type="email"
-                name="email"
-                placeholder="Email"
-                value={userForm.email}
-                onChange={handleUserChange}
-                className="border p-2 w-full"
-                required
-            />
-            <input
-                type="password"
-                name="password"
-                placeholder="Password"
-                value={userForm.password}
-                onChange={handleUserChange}
-                className="border p-2 w-full"
-                required
-            />
-            <input
-                type="password"
-                name="password_confirmation"
-                placeholder="Confirm Password"
-                value={userForm.password_confirmation}
-                onChange={handleUserChange}
-                className="border p-2 w-full"
-                required
-            />
-            <input
-                type="text"
-                name="role"
-                placeholder="Role (e.g., Super Admin, Support)"
-                value={userForm.role}
-                onChange={handleUserChange}
-                className="border p-2 w-full"
-                required
-            />
-            <button className="px-4 py-2 bg-blue-600 text-white rounded">
-                Create User
-            </button>
-        </form>
-
-        {/* Users Table */}
-        
-            <table className="w-full border bg-white shadow-sm rounded-lg">
-                <thead className="bg-gray-100">
-                    <tr>
-                        <th className="p-2">Name</th>
-                        <th className="p-2">Email</th>
-                        <th className="p-2">Role</th>
-                        <th className="p-2">Created At</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {users.length > 0 ? (
-                        users.map((user) => (
-                            <tr key={user.id}>
-                                <td className="p-2">{user.name}</td>
-                                <td className="p-2">{user.email}</td>
-                                <td className="p-2">{user.role}</td>
-                                <td className="p-2">{user.created_at}</td>
-                            </tr>
-                        ))
-                    ) : (
-                        <tr>
-                            <td colSpan="4" className="p-4 text-center text-gray-500">
-                                No users found.
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-        
-    </div>
-)}
-                </div> )} </div>)};
+                </div>
+            )}
+        </div>
+    );
+}
