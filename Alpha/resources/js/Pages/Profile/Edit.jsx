@@ -4,9 +4,9 @@ import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 import { useState } from 'react';
-import { FiHome, FiUser, FiLock, FiTrash2, FiChevronRight, FiShield } from 'react-icons/fi';
+import { FiHome, FiUser, FiLock, FiTrash2, FiChevronRight, FiShield, FiArrowLeft } from 'react-icons/fi';
 export default function Edit({ mustVerifyEmail, status, auth }) {
-    const [activeTab, setActiveTab] = useState('profile');
+    const [activeTab, setActiveTab] = useState('dashboard');
     const { user } = auth;
 
     // Function to get user initials
@@ -27,12 +27,19 @@ export default function Edit({ mustVerifyEmail, status, auth }) {
                     {/* Profile Header */}
                     <div className="md:flex md:items-center md:justify-between mb-8">
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate">
-                                Account Settings
-                            </h2>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                Manage your account settings and preferences
-                            </p>
+                            <div className="flex items-center space-x-4">
+                                <Link href="/superadmin/tenants" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                    <FiArrowLeft className="w-8 h-8" />
+                                </Link>
+                                <div>
+                                    <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate">
+                                        Account Settings
+                                    </h2>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                        Manage your account settings and preferences
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -67,7 +74,7 @@ export default function Edit({ mustVerifyEmail, status, auth }) {
                                         }`}
                                     >
                                         <FiHome className={`mr-3 h-5 w-5 ${activeTab === 'dashboard' ? 'text-blue-500' : 'text-gray-400'}`} />
-                                        Dashboard
+                                        Account Profile
                                         <FiChevronRight className="ml-auto h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300" />
                                     </button>
                                     
@@ -113,16 +120,18 @@ export default function Edit({ mustVerifyEmail, status, auth }) {
                             <div className="flex-1 p-6">
                                 <div className="max-w-2xl mx-auto">
                                     {activeTab === 'dashboard' && (
-                                        <div className="space-y-6">
+                                        <div className="space-y-6 bg-white dark:bg-gray-800/30 p-6 shadow-sm rounded-lg">
                                             <div>
-                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Dashboard</h3>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Account</h3>
                                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                                     Overview of your account and recent activities.
                                                 </p>
                                             </div>
                                             <div className="space-y-4">
-                                                <h3 className="text-lg font-medium">Welcome back, {auth.user.name}!</h3>
-                                                <p className="text-gray-600">
+                                                <h3 className="text-lg font-medium text-blue-600 dark:text-blue-400">
+                                                    Welcome back, {auth.user.name}!
+                                                </h3>
+                                                <p className="text-gray-600 dark:text-gray-400">
                                                     Manage your profile information, update your password, or delete your account.
                                                 </p>
                                             </div>

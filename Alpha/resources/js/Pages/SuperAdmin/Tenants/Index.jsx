@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
-import { usePage } from '@inertiajs/react';
-import { FiUsers, FiFileText, FiCreditCard, FiPlus, FiChevronRight, FiLogOut, FiUser, FiSettings, FiChevronDown, FiX } from 'react-icons/fi';
 
-export default function Dashboard({ tenants, paidApplications, subscriptionPlans ,users }) {
+import { FiUsers, FiFileText, FiCreditCard, FiPlus, FiChevronRight, FiLogOut, FiUser, FiSettings, FiChevronDown, FiX, FiLayout, FiDollarSign } from 'react-icons/fi';
 
-    const [activeTab, setActiveTab] = useState("tenants");
+export default function Dashboard({ auth, tenants, paidApplications, subscriptionPlans }) {
+    const [activeTab, setActiveTab] = useState("dashboard");
+
     const [showCreateTenant, setShowCreateTenant] = useState(false);
     const [showTenantForm, setShowTenantForm] = useState(false);
     const [showPlanForm, setShowPlanForm] = useState(false);
@@ -73,6 +73,7 @@ const handleUserSubmit = (e) => {
     // Sidebar tab labels
     const tabs = [
 
+        { key: "dashboard", label: "Dashboard", icon: <FiLayout className="mr-2" /> },
         { key: "tenants", label: "Tenants", icon: <FiUsers className="mr-2" /> },
         { key: "paidApps", label: "Paid Applications", icon: <FiFileText className="mr-2" />  },
         { key: "plans", label: "Subscription Plans",icon: <FiCreditCard className="mr-2" />  },
@@ -83,11 +84,21 @@ const handleUserSubmit = (e) => {
                 <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
     {/* Header */}
             <header className={`sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 transition-colors duration-300`}>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-                            Tenant Management
-                        </h1>
+                        <div className="space-y-2">
+                            <div className="flex items-baseline space-x-3">
+                                <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
+                                    Super Admin
+                                </h1>
+                                <span className="text-sm font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                    Admin Console
+                                </span>
+                            </div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Manage organization tenants, subscriptions, and system settings
+                            </p>
+                        </div>
                         
                         {/* Profile Dropdown */}
                         <div className="relative">
@@ -218,6 +229,107 @@ const handleUserSubmit = (e) => {
 
                 {/* Main Content */}
                 <main className="flex-1 p-4 md:p-8">
+                    {/* Dashboard Tab */}
+                    {activeTab === "dashboard" && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {/* Total Tenants Card */}
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tenants</p>
+                                            <p className="text-3xl font-bold mt-1">{tenants?.length || 0}</p>
+                                        </div>
+                                        <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
+                                            <FiUsers className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Active now</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Active Subscriptions Card */}
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
+                                            <p className="text-3xl font-bold mt-1">
+                                                {subscriptionPlans?.reduce((acc, plan) => acc + (plan.subscriptions_count || 0), 0) || 0}
+                                            </p>
+                                        </div>
+                                        <div className="p-3 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-200">
+                                            <FiCreditCard className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm text-green-600 dark:text-green-400">+2.5% from last month</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Pending Applications Card */}
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Applications</p>
+                                            <p className="text-3xl font-bold mt-1">{paidApplications?.length || 0}</p>
+                                        </div>
+                                        <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-200">
+                                            <FiFileText className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Needs review</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Revenue Card */}
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Revenue</p>
+                                            <p className="text-3xl font-bold mt-1">
+                                                ${subscriptionPlans?.reduce((acc, plan) => acc + ((plan.price || 0) * (plan.subscriptions_count || 0)), 0).toLocaleString() || '0'}
+                                            </p>
+                                        </div>
+                                        <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-200">
+                                            <FiDollarSign className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <p className="text-sm text-green-600 dark:text-green-400">+12.3% from last month</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Recent Activity Section */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-lg font-semibold">Recent Activity</h2>
+                                    <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">View All</button>
+                                </div>
+                                <div className="space-y-4">
+                                    {tenants?.slice(0, 5).map((tenant, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                                                    <FiUser className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium">New tenant registered</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">{tenant.name}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                {new Date(tenant.created_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
                     {/* Tenants Tab */}
                     {activeTab === "tenants" && (
                         <div className="space-y-6">
