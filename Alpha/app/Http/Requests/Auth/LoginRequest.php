@@ -11,23 +11,6 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
-    public function store(LoginRequest $request)
-    {
-        $request->authenticate();
-
-        $request->session()->regenerate();
-
-        // Store tenant ID in session
-        $user = Auth::user();
-        if ($user->role === 'Super_admin') {
-            // Super admin goes to central dashboard / tenant management page
-            return redirect()->route('tenants.index');
-        }
-        session(['tenant_id' => $user->tenant_id, 'role' => $user->role,]);
-
-        return redirect()->intended(route('dashboard', absolute: false));
-    }
-
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -46,7 +29,8 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
-            'tenant_id' => ['required', 'string', 'exists:tenants,database'],
+            // Optional numeric tenant id; required only for non Super_admin users (enforced in authenticate)
+            'tenant_id' => ['nullable', 'integer', 'exists:tenants,id'],
         ];
     }
 
@@ -57,33 +41,41 @@ class LoginRequest extends FormRequest
      */
     public function authenticate(): void
     {
-        // Get tenant by database
-        $tenant = \App\Models\Tenant::where('database', $this->tenant_id)->first();
-        
-        if (! $tenant) {
-            throw ValidationException::withMessages([
-                'tenant_id' => 'Invalid tenant selected.',
-            ]);
-        }
+        $this->ensureIsNotRateLimited();
 
-        // Find user by email in central database
-        $user = \App\Models\User::where('email', $this->email)->first();
+        // Basic credentials (central users table)
+        $credentials = [
+            'email' => $this->email,
+            'password' => $this->password,
+        ];
 
-        if (! $user || ! Auth::attempt(
-            ['email' => $this->email, 'password' => $this->password],
-            $this->boolean('remember')
-        )) {
+        if (! Auth::attempt($credentials, $this->boolean('remember'))) {
+            RateLimiter::hit($this->throttleKey());
+
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
             ]);
         }
 
-        // Check if user belongs to selected tenant
-        if ($user->tenant_id !== $tenant->id) {
-            Auth::logout();
-            throw ValidationException::withMessages([
-                'email' => 'This account does not belong to the selected tenant.',
-            ]);
+        RateLimiter::clear($this->throttleKey());
+
+        $user = Auth::user();
+
+        // For non Super_admin users, tenant_id must match (if provided)
+        if ($user->role !== 'Super_admin') {
+            if (! $this->filled('tenant_id')) {
+                Auth::logout();
+                throw ValidationException::withMessages([
+                    'tenant_id' => 'Please select a company.',
+                ]);
+            }
+
+            if ((int) $user->tenant_id !== (int) $this->tenant_id) {
+                Auth::logout();
+                throw ValidationException::withMessages([
+                    'email' => 'This account does not belong to the selected company.',
+                ]);
+            }
         }
     }
     /**
