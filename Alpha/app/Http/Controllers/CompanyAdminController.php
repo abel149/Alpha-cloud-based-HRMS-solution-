@@ -76,18 +76,31 @@ class CompanyAdminController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            // email must be unique in both central and tenant users tables
+            'email' => 'required|email|unique:users,email|unique:Tenant.users,email',
             'password' => 'required|min:8',
             'role' => 'required|in:hr_manager,finance_manager,department_manager,employee',
-            'department_id' => 'nullable|exists:departments,id',
+            // department belongs to Tenant DB
+            'department_id' => 'nullable|exists:Tenant.departments,id',
             'hire_date' => 'required|date',
             'job_title' => 'required|string',
-            'employee_code' => 'required|string|unique:employees,employee_code',
+            // employees table is also on Tenant connection
+            'employee_code' => 'required|string|unique:Tenant.employees,employee_code',
             'phone' => 'nullable|string',
             'salary' => 'nullable|numeric',
             'employment_type' => 'required|in:full_time,part_time,contract,intern',
         ]);
 
+        // Create central user for authentication (uses default connection)
+        $centralUser = \App\Models\User::create([
+            'name'      => $request->name,
+            'email'     => $request->email,
+            'password'  => Hash::make($request->password),
+            'role'      => $request->role,
+            'tenant_id' => auth()->user()->tenant_id, // same tenant as company admin
+        ]);
+
+        // Create tenant-specific user + employee record
         DB::connection('Tenant')->transaction(function () use ($request) {
             $user = new User();
             $user->setConnection('Tenant');
@@ -113,16 +126,113 @@ class CompanyAdminController extends Controller
         return back()->with('success', 'Employee created successfully');
     }
 
+    public function updateEmployee(Request $request, $id)
+    {
+        $employee = Employee::with('user')->findOrFail($id);
+        $user = $employee->user;
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            // unique email in both Tenant and central users tables, excluding current user
+            'email' => 'required|email|unique:users,email,' . ($user?->email ?? 'NULL') . ',email|unique:Tenant.users,email,' . ($user?->id ?? 'NULL') . ',id',
+            'password' => 'nullable|min:8',
+            'role' => 'required|in:hr_manager,finance_manager,department_manager,employee',
+            'department_id' => 'nullable|exists:Tenant.departments,id',
+            'hire_date' => 'required|date',
+            'job_title' => 'required|string',
+            'employee_code' => 'required|string|unique:Tenant.employees,employee_code,' . $employee->id,
+            'phone' => 'nullable|string',
+            'salary' => 'nullable|numeric',
+            'employment_type' => 'required|in:full_time,part_time,contract,intern',
+        ]);
+
+        DB::connection('Tenant')->transaction(function () use ($request, $employee, $user) {
+            if ($user) {
+                $user->setConnection('Tenant');
+                $user->name = $request->name;
+                $user->email = $request->email;
+                if ($request->filled('password')) {
+                    $user->password = Hash::make($request->password);
+                }
+                $user->role = $request->role;
+                $user->save();
+            }
+
+            $employee->update([
+                'department_id' => $request->department_id,
+                'hire_date' => $request->hire_date,
+                'job_title' => $request->job_title,
+                'employee_code' => $request->employee_code,
+                'phone' => $request->phone,
+                'salary' => $request->salary,
+                'employment_type' => $request->employment_type,
+            ]);
+        });
+
+        return back()->with('success', 'Employee updated successfully');
+    }
+
+    public function destroyEmployee($id)
+    {
+        // First fetch employee & tenant user
+        $employee = Employee::with('user')->findOrFail($id);
+        $tenantUser = $employee->user;
+
+        // Delete matching central user (if any) based on email
+        if ($tenantUser && $tenantUser->email) {
+            $centralUser = \App\Models\User::where('email', $tenantUser->email)->first();
+            if ($centralUser) {
+                $centralUser->delete();
+            }
+        }
+
+        // Then delete tenant-side records
+        DB::connection('Tenant')->transaction(function () use ($employee, $tenantUser) {
+            if ($tenantUser) {
+                $tenantUser->setConnection('Tenant');
+                $tenantUser->delete();
+            }
+
+            $employee->delete();
+        });
+
+        return back()->with('success', 'Employee deleted successfully');
+    }
+
     public function storeDepartment(Request $request)
     {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            // managers are users in the Tenant DB
+            'manager_id' => 'nullable|exists:Tenant.users,id',
+        ]);
+
+        Department::create($request->all());
+        return back()->with('success', 'Department created successfully');
+    }
+
+    public function updateDepartment(Request $request, $id)
+    {
+        $department = Department::findOrFail($id);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'manager_id' => 'nullable|exists:users,id',
         ]);
 
-        Department::create($request->all());
-        return back()->with('success', 'Department created successfully');
+        $department->update($request->only('name', 'description', 'manager_id'));
+
+        return back()->with('success', 'Department updated successfully');
+    }
+
+    public function destroyDepartment($id)
+    {
+        $department = Department::findOrFail($id);
+        $department->delete();
+
+        return back()->with('success', 'Department deleted successfully');
     }
 
     public function storeLeavePolicy(Request $request)
@@ -140,6 +250,32 @@ class CompanyAdminController extends Controller
         return back()->with('success', 'Leave policy created successfully');
     }
 
+    public function updateLeavePolicy(Request $request, $id)
+    {
+        $policy = LeavePolicy::findOrFail($id);
+
+        $request->validate([
+            'policy_name' => 'required|string|max:255',
+            'leave_type' => 'required|string',
+            'days_allowed_per_year' => 'required|integer|min:1',
+            'is_paid' => 'boolean',
+            'description' => 'nullable|string',
+            'max_consecutive_days' => 'nullable|integer',
+        ]);
+
+        $policy->update($request->only('policy_name', 'leave_type', 'days_allowed_per_year', 'is_paid', 'description', 'max_consecutive_days'));
+
+        return back()->with('success', 'Leave policy updated successfully');
+    }
+
+    public function destroyLeavePolicy($id)
+    {
+        $policy = LeavePolicy::findOrFail($id);
+        $policy->delete();
+
+        return back()->with('success', 'Leave policy deleted successfully');
+    }
+
     public function storeAttendancePolicy(Request $request)
     {
         $request->validate([
@@ -152,6 +288,31 @@ class CompanyAdminController extends Controller
 
         AttendancePolicy::create($request->all());
         return back()->with('success', 'Attendance policy created successfully');
+    }
+
+    public function updateAttendancePolicy(Request $request, $id)
+    {
+        $policy = AttendancePolicy::findOrFail($id);
+
+        $request->validate([
+            'policy_name' => 'required|string|max:255',
+            'work_start_time' => 'required',
+            'work_end_time' => 'required',
+            'grace_period_minutes' => 'integer|min:0',
+            'minimum_work_hours' => 'integer|min:1',
+        ]);
+
+        $policy->update($request->only('policy_name', 'work_start_time', 'work_end_time', 'grace_period_minutes', 'minimum_work_hours'));
+
+        return back()->with('success', 'Attendance policy updated successfully');
+    }
+
+    public function destroyAttendancePolicy($id)
+    {
+        $policy = AttendancePolicy::findOrFail($id);
+        $policy->delete();
+
+        return back()->with('success', 'Attendance policy deleted successfully');
     }
 
     public function storeRole(Request $request)
@@ -170,5 +331,36 @@ class CompanyAdminController extends Controller
         }
 
         return back()->with('success', 'Role created successfully');
+    }
+
+    public function updateRole(Request $request, $id)
+    {
+        $role = Role::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|unique:roles,name,' . $role->id,
+            'display_name' => 'required|string',
+            'description' => 'nullable|string',
+            'permissions' => 'array',
+        ]);
+
+        $role->update($request->except('permissions'));
+
+        if ($request->has('permissions')) {
+            $role->permissions()->sync($request->permissions);
+        } else {
+            $role->permissions()->sync([]);
+        }
+
+        return back()->with('success', 'Role updated successfully');
+    }
+
+    public function destroyRole($id)
+    {
+        $role = Role::findOrFail($id);
+        $role->permissions()->detach();
+        $role->delete();
+
+        return back()->with('success', 'Role deleted successfully');
     }
 }
