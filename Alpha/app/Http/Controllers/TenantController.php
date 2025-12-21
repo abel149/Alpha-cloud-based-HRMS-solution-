@@ -23,6 +23,16 @@ class TenantController extends Controller
             'subscriptionId' => 'required|string',
             'database' => 'required|string|unique:tenants,database',
             'createdby' => 'nullable|integer',
+            // Keep tenant_application_id optional and do not enforce exists() here,
+            // to avoid validation failures if the ID/connection mismatch. We'll
+            // still try to match and update the application record below.
+            'tenant_application_id' => 'nullable|integer',
+        ]);
+
+        Log::info('TenantController@store called from Super Admin', [
+            'subscriptionId' => $request->subscriptionId,
+            'database' => $request->database,
+            'tenant_application_id' => $request->tenant_application_id,
         ]);
 
         $dbName = $request->database;
@@ -45,6 +55,10 @@ class TenantController extends Controller
                 'subscription_id' => $request->subscriptionId,
                 'database' => $dbName,
                 'created_by' => $request->createdby,
+            ]);
+            Log::info('Tenant created successfully (central tenants table)', [
+                'tenant_id' => $tenant->id,
+                'database' => $tenant->database,
             ]);
 
             // Set tenant DB config dynamically
@@ -73,6 +87,23 @@ class TenantController extends Controller
                 '--force' => true,
             ]);
 
+            // If this tenant comes from a paid application, mark it as created.
+            // We match by both explicit tenant_application_id and by transaction_id (subscriptionId)
+            // so the row is updated even if one of them is missing.
+            TenantApplication::where(function ($q) use ($request) {
+                if ($request->filled('tenant_application_id')) {
+                    $q->where('id', $request->tenant_application_id);
+                }
+
+                if ($request->filled('subscriptionId')) {
+                    if ($request->filled('tenant_application_id')) {
+                        $q->orWhere('transaction_id', $request->subscriptionId);
+                    } else {
+                        $q->where('transaction_id', $request->subscriptionId);
+                    }
+                }
+            })->update(['tenant_created' => 1]);
+
             // ✅ Redirect back with success message (Inertia-friendly)
             return redirect()->route('tenants.index')->with('success', 'Tenant created successfully!');
         } catch (Exception $e) {
@@ -91,8 +122,14 @@ class TenantController extends Controller
         // Fetch tenants
         $tenants = Tenant::all();
 
-        // Fetch tenant applications that have completed payment
-        $paidApplications = TenantApplication::where('payment_status', 'Paid')->get();
+        // Fetch tenant applications that have completed payment but are not yet provisioned as tenants
+        // (tenant_created is either NULL or explicitly 0)
+        $paidApplications = TenantApplication::where('payment_status', 'Paid')
+            ->where(function ($q) {
+                $q->whereNull('tenant_created')
+                  ->orWhere('tenant_created', 0);
+            })
+            ->get();
 
         // Fetch all subscription plans
         $subscriptionPlans = SubscriptionPlan::all();
@@ -107,6 +144,24 @@ class TenantController extends Controller
         ]);
     }
 
+    public function update(Request $request, Tenant $tenant)
+    {
+        $data = $request->validate([
+            'subscription_id' => 'nullable|string|max:255',
+        ]);
+
+        $tenant->update($data);
+
+        return redirect()->route('tenants.index')->with('success', 'Tenant updated successfully!');
+    }
+
+    public function destroy(Tenant $tenant)
+    {
+        $tenant->delete();
+
+        return redirect()->route('tenants.index')->with('success', 'Tenant deleted successfully!');
+    }
+
     public function create()
     {
         // Fetch subscription plans for the create form
@@ -119,11 +174,11 @@ class TenantController extends Controller
     public function storeuser(Request $request)
     {
         $request->validate([
-            'tenantid' => 'integer',
+            'tenantid' => 'nullable|integer',
             'name' => 'required|string',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|confirmed|min:8',
-            'role' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|min:6',
+            'role' => 'nullable|string',
         ]);
 
         User::create([

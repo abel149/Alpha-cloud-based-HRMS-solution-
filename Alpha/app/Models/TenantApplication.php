@@ -9,6 +9,8 @@ class TenantApplication extends Model
 {
     use HasFactory;
 
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'company_name',
         'email',
@@ -16,5 +18,9 @@ class TenantApplication extends Model
         'transaction_id',
         'payment_status',
         'tenant_created',
+    ];
+
+    protected $casts = [
+        'tenant_created' => 'boolean',
     ];
 }

@@ -36,8 +36,15 @@ class TenantApplicationController extends Controller
         // 3. Determine amount dynamically
         $amount = $request->plan === 'pro' ? 1000 : 500;
 
-        // 4. Use full callback URL from .env (important for Chapa)
-        $callbackUrl = env('CHAPA_CALLBACK_URL', route('chapa.callback'));
+        // 4. Resolve callback URL
+        // Prefer explicit CHAPA_CALLBACK_URL if set, otherwise fall back to route URL
+        $callbackUrl = env('CHAPA_CALLBACK_URL');
+        if (empty($callbackUrl)) {
+            $callbackUrl = route('chapa.callback');
+        }
+
+        // Log which callback URL we're actually sending to Chapa
+        Log::info('Chapa callback URL being used', ['callback_url' => $callbackUrl]);
 
         // 5. Initialize Chapa payment
         $payment = $chapa->initializePayment([
@@ -45,7 +52,7 @@ class TenantApplicationController extends Controller
             'currency' => 'ETB',
             'email' => $application->email,
             'first_name' => $application->company_name,
-            'tx_ref' => $tx_ref,
+            'tx_ref'       => $tx_ref,
             'callback_url' => $callbackUrl,
         ]);
 
@@ -68,18 +75,20 @@ class TenantApplicationController extends Controller
     }
     public function chapaCallback(Request $request, ChapaService $chapa)
     {
-        // Chapa sends trx_ref
-        $tx_ref = $request->get('trx_ref');
+        // Chapa may send tx_ref, trx_ref or reference depending on config/version
+        $tx_ref = $request->get('tx_ref')
+            ?? $request->get('trx_ref')
+            ?? $request->get('reference');
 
         if (!$tx_ref) {
-            Log::error('Chapa callback missing trx_ref/reference');
-            return response('Missing trx_ref', 400);
+            Log::error('Chapa callback missing tx_ref/trx_ref/reference', ['payload' => $request->all()]);
+            return response('Missing tx_ref', 400);
         }
 
         $application = TenantApplication::where('transaction_id', $tx_ref)->first();
 
         if (!$application) {
-            Log::error("Chapa callback: Application not found for tx_ref {$tx_ref}");
+            Log::error('Chapa callback: Application not found for tx_ref', ['tx_ref' => $tx_ref]);
             return response('Application not found', 404);
         }
 
