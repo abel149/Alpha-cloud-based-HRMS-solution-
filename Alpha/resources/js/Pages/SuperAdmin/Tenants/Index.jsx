@@ -3,17 +3,29 @@ import { Inertia } from "@inertiajs/inertia";
 
 import { FiUsers, FiFileText, FiCreditCard, FiPlus, FiChevronRight, FiLogOut, FiUser, FiSettings, FiChevronDown, FiX, FiLayout, FiDollarSign } from 'react-icons/fi';
 
-export default function Dashboard({ auth, tenants, paidApplications, subscriptionPlans }) {
-    const [activeTab, setActiveTab] = useState("dashboard");
+export default function Dashboard({ auth, tenants, paidApplications, subscriptionPlans, users = [] }) {
+    // Persist selected tab so redirects/reloads keep the same section open
+    const [activeTab, setActiveTabState] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.localStorage.getItem('sa_tenants_active_tab') || 'dashboard';
+        }
+        return 'dashboard';
+    });
+
+    const setActiveTab = (tabKey) => {
+        setActiveTabState(tabKey);
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('sa_tenants_active_tab', tabKey);
+        }
+    };
 
     const [showCreateTenant, setShowCreateTenant] = useState(false);
     const [showTenantForm, setShowTenantForm] = useState(false);
     const [showPlanForm, setShowPlanForm] = useState(false);
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  
-    // Get authenticated user data from Inertia props
-    const { auth } = usePage().props;
-    const { user } = auth;
+
+    // Get authenticated user data from props
+    const user = auth?.user || {};
 
     // Function to get user initials
     const getInitials = (name) => {
@@ -28,7 +40,8 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
     const [tenantForm, setTenantForm] = useState({
         subscriptionId: "",
         database: "",
-        createdby: "",
+        createdby: user.id || "",
+        tenant_application_id: "",
     });
 
     const [planForm, setPlanForm] = useState({
@@ -39,13 +52,18 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
         durationDays: "",
     });
     const [userForm, setUserForm] = useState({
-    tenantid:"",
-    name: "",
-    email: "",
-    password: "",
-    password_confirmation: "",
-    role: "",
-});
+        tenantid: "",
+        name: "",
+        email: "",
+        password: "",
+        password_confirmation: "",
+        role: "",
+    });
+
+    const [editingTenant, setEditingTenant] = useState(null);
+    const [editTenantForm, setEditTenantForm] = useState({
+        subscription_id: "",
+    });
 
     const handleTenantChange = (e) =>
         setTenantForm({ ...tenantForm, [e.target.name]: e.target.value });
@@ -55,34 +73,178 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
 
     const handleTenantSubmit = (e) => {
         e.preventDefault();
-        Inertia.post("/superadmin/tenants", tenantForm);
+        Inertia.post("/superadmin/tenants", tenantForm, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setActiveTab("tenants"),
+        });
+    };
+
+    const startTenantFromApplication = (app) => {
+        // Derive a simple, unique database name from company name (slug-like)
+        const slug = app.company_name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+
+        // Use the paid transaction id as subscriptionId directly
+        const payload = {
+            subscriptionId: app.transaction_id,
+            // Append application id so DB name is always unique, even for same company name
+            database: slug ? `tenant_${slug}_${app.id}` : `tenant_${app.id}`,
+            createdby: user.id || "",
+            tenant_application_id: app.id,
+        };
+
+        Inertia.post("/superadmin/tenants", payload, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setActiveTab("paidApps"),
+        });
     };
 
     const handlePlanSubmit = (e) => {
         e.preventDefault();
-        Inertia.post("/subscription-plans", planForm);
+        Inertia.post("/subscription-plans", planForm, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setActiveTab("plans"),
+        });
     };
     const handleUserChange = (e) =>
-    setUserForm({ ...userForm, [e.target.name]: e.target.value });
+        setUserForm({ ...userForm, [e.target.name]: e.target.value });
 
-const handleUserSubmit = (e) => {
-    e.preventDefault();
-    Inertia.post("/users", userForm);
-};
+    const handleUserSubmit = (e) => {
+        e.preventDefault();
+        Inertia.post("/users", userForm, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setActiveTab("users"),
+        });
+    };
+
+    const openEditTenant = (tenant) => {
+        setEditingTenant(tenant);
+        setEditTenantForm({
+            subscription_id: tenant.subscription_id || "",
+        });
+    };
+
+    const closeEditTenant = () => {
+        setEditingTenant(null);
+    };
+
+    const handleEditTenantChange = (e) => {
+        setEditTenantForm({ ...editTenantForm, [e.target.name]: e.target.value });
+    };
+
+    const handleEditTenantSubmit = (e) => {
+        e.preventDefault();
+        if (!editingTenant) return;
+
+        Inertia.put(`/superadmin/tenants/${editingTenant.id}`, editTenantForm, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setEditingTenant(null);
+                setActiveTab("tenants");
+            },
+        });
+    };
+
+    const handleDeleteTenant = (tenant) => {
+        if (!confirm(`Are you sure you want to delete tenant #${tenant.id}?`)) {
+            return;
+        }
+
+        Inertia.delete(`/superadmin/tenants/${tenant.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setActiveTab("tenants"),
+        });
+    };
 
     // Sidebar tab labels
     const tabs = [
 
         { key: "dashboard", label: "Dashboard", icon: <FiLayout className="mr-2" /> },
         { key: "tenants", label: "Tenants", icon: <FiUsers className="mr-2" /> },
-        { key: "paidApps", label: "Paid Applications", icon: <FiFileText className="mr-2" />  },
-        { key: "plans", label: "Subscription Plans",icon: <FiCreditCard className="mr-2" />  },
-        { key: "users", label: "Super Admin Users", icon: <FiUsers className="mr-2" /> }, 
+        { key: "paidApps", label: "Paid Applications", icon: <FiFileText className="mr-2" /> },
+        { key: "plans", label: "Subscription Plans", icon: <FiCreditCard className="mr-2" /> },
+        { key: "users", label: "Super Admin Users", icon: <FiUsers className="mr-2" /> },
     ];
 
+    // Helper to hide paid applications that already have a tenant
+    const visiblePaidApplications = paidApplications
+        .filter((app) => {
+            // If backend says tenant_created, hide it
+            if (app.tenant_created) return false;
+
+            // If a tenant exists with matching subscription_id (we store transaction_id there), hide it
+            const hasMatchingSubscription = tenants.some(
+                (t) => t.subscription_id === app.transaction_id
+            );
+
+            if (hasMatchingSubscription) return false;
+
+            // Also match by database name pattern tenant_{slug(company_name)}
+            const slug = app.company_name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_")
+                .replace(/^_+|_+$/g, "");
+
+            const expectedDb = slug ? `tenant_${slug}` : null;
+
+            if (expectedDb) {
+                const hasMatchingDb = tenants.some(
+                    (t) => t.database === expectedDb
+                );
+                if (hasMatchingDb) return false;
+            }
+
+            // Otherwise keep it visible
+            return true;
+        });
+
     return (
-                <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
-    {/* Header */}
+        <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+            {editingTenant && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-lg font-semibold mb-4">Edit Tenant #{editingTenant.id}</h3>
+                        <form onSubmit={handleEditTenantSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Subscription ID
+                                </label>
+                                <input
+                                    type="text"
+                                    name="subscription_id"
+                                    value={editTenantForm.subscription_id}
+                                    onChange={handleEditTenantChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={closeEditTenant}
+                                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* Header */}
             <header className={`sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 transition-colors duration-300`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
                     <div className="flex items-center justify-between">
@@ -99,7 +261,7 @@ const handleUserSubmit = (e) => {
                                 Manage organization tenants, subscriptions, and system settings
                             </p>
                         </div>
-                        
+
                         {/* Profile Dropdown */}
                         <div className="relative">
                             <button
@@ -117,26 +279,26 @@ const handleUserSubmit = (e) => {
                                     <FiChevronDown className="ml-2 h-4 w-4 text-gray-400" />
                                 </div>
                             </button>
-                            
+
                             {/* Dropdown menu */}
                             {showProfileDropdown && (
-                                    <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-                                        <div className="py-1" role="none">
+                                <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                                    <div className="py-1" role="none">
                                         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                                             <p className="text-sm text-gray-900 dark:text-white">{user.name}</p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
-                                    </div>  
-                                    
-                                     <a
-                                         href={route('profile.edit')}
-                                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                
-                                       >
+                                        </div>
+
+                                        <a
+                                            href={route('profile.edit')}
+                                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+
+                                        >
                                             <FiUser className="mr-3 h-5 w-5 text-gray-400" />
                                             Your Profile
-                                    </a>
-                                        
-                                     
+                                        </a>
+
+
                                         <button
                                             onClick={() => Inertia.post(route('logout'))}
                                             className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:text-red-400 dark:hover:bg-gray-700"
@@ -160,11 +322,10 @@ const handleUserSubmit = (e) => {
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                                    activeTab === tab.key
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
-                                }`}
+                                className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === tab.key
+                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                    }`}
                             >
                                 {tab.icon}
                                 {tab.label}
@@ -187,14 +348,14 @@ const handleUserSubmit = (e) => {
                 {/* Mobile menu */}
                 {showCreateTenant && (
                     <div className="md:hidden fixed inset-0 z-40">
-                        <div 
+                        <div
                             className="fixed inset-0 bg-black/50 backdrop-blur-sm"
                             onClick={() => setShowCreateTenant(false)}
                         />
                         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl p-4 shadow-2xl">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-semibold">Create New</h3>
-                                <button 
+                                <button
                                     onClick={() => setShowCreateTenant(false)}
                                     className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                                 >
@@ -248,7 +409,7 @@ const handleUserSubmit = (e) => {
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Active now</p>
                                     </div>
                                 </div>
-                                
+
                                 {/* Active Subscriptions Card */}
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                                     <div className="flex items-center justify-between">
@@ -266,7 +427,7 @@ const handleUserSubmit = (e) => {
                                         <p className="text-sm text-green-600 dark:text-green-400">+2.5% from last month</p>
                                     </div>
                                 </div>
-                                
+
                                 {/* Pending Applications Card */}
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                                     <div className="flex items-center justify-between">
@@ -282,7 +443,7 @@ const handleUserSubmit = (e) => {
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Needs review</p>
                                     </div>
                                 </div>
-                                
+
                                 {/* Revenue Card */}
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                                     <div className="flex items-center justify-between">
@@ -301,7 +462,7 @@ const handleUserSubmit = (e) => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Recent Activity Section */}
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                                 <div className="flex items-center justify-between mb-6">
@@ -329,22 +490,15 @@ const handleUserSubmit = (e) => {
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Tenants Tab */}
                     {activeTab === "tenants" && (
                         <div className="space-y-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                 <div>
                                     <h2 className="text-2xl font-bold">Tenants</h2>
-                                    <p className="text-gray-600 dark:text-gray-400">Manage your organization's tenants</p>
+                                    <p className="text-gray-600 dark:text-gray-400">List of all provisioned tenant databases</p>
                                 </div>
-                                <button
-                                    onClick={() => setShowTenantForm(true)}
-                                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                                >
-                                    <FiPlus className="mr-2" />
-                                    Add Tenant
-                                </button>
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -356,6 +510,7 @@ const handleUserSubmit = (e) => {
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Database</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subscription ID</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created By</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -363,14 +518,30 @@ const handleUserSubmit = (e) => {
                                                 tenants.map((tenant) => (
                                                     <tr key={tenant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{tenant.id}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{tenant.database}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-100 font-mono">{tenant.database}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">{tenant.subscription_id}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{tenant.created_by || '-'}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEditTenant(tenant)}
+                                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteTenant(tenant)}
+                                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </td>
                                                     </tr>
-                                                ))
+                                                    ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="4" className="px-6 py-12 text-center">
+                                                    <td colSpan="5" className="px-6 py-12 text-center">
                                                         <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
                                                             <FiUsers className="h-12 w-12 opacity-30" />
                                                             <p className="text-lg font-medium">No tenants found</p>
@@ -407,23 +578,37 @@ const handleUserSubmit = (e) => {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {paidApplications.length > 0 ? (
-                                                paidApplications.map((app) => (
+                                            {visiblePaidApplications.length > 0 ? (
+                                                visiblePaidApplications.map((app) => (
                                                     <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{app.company_name}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.email}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{app.plan}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">{app.transaction_id}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                                app.payment_status === 'completed' 
-                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                                            }`}>
+                                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${app.payment_status === 'Paid'
+                                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                                                }`}>
                                                                 {app.payment_status}
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.created_at}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                                            {app.tenant_created ? (
+                                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                                    Tenant created
+                                                                </span>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => startTenantFromApplication(app)}
+                                                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                                                                >
+                                                                    Create Tenant
+                                                                </button>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
@@ -508,11 +693,11 @@ const handleUserSubmit = (e) => {
                                 <div className="fixed inset-0 z-50 overflow-y-auto">
                                     <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                                         {/* Background overlay */}
-                                        <div 
+                                        <div
                                             className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
                                             onClick={() => setShowPlanForm(false)}
                                         />
-                                        
+
                                         {/* Modal panel */}
                                         <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
                                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -533,68 +718,68 @@ const handleUserSubmit = (e) => {
                                                                 required
                                                             />
                                                         </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Plan Name</label>
-                                                <input
-                                                    type="text"
-                                                    name="name"
-                                                    value={planForm.name}
-                                                    onChange={handlePlanChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                    placeholder="e.g., Premium Monthly"
-                                                    required
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price</label>
-                                                <div className="relative rounded-md shadow-sm">
-                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                        <span className="text-gray-500 sm:text-sm">$</span>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Plan Name</label>
+                                                            <input
+                                                                type="text"
+                                                                name="name"
+                                                                value={planForm.name}
+                                                                onChange={handlePlanChange}
+                                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                                placeholder="e.g., Premium Monthly"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price</label>
+                                                            <div className="relative rounded-md shadow-sm">
+                                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                                    <span className="text-gray-500 sm:text-sm">$</span>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    name="price"
+                                                                    value={planForm.price}
+                                                                    onChange={handlePlanChange}
+                                                                    className="block w-full pl-7 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                                    placeholder="0.00"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    required
+                                                                />
+                                                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                                    <span className="text-gray-500 sm:text-sm">USD</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (Days)</label>
+                                                            <input
+                                                                type="number"
+                                                                name="durationDays"
+                                                                value={planForm.durationDays}
+                                                                onChange={handlePlanChange}
+                                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                                placeholder="e.g., 30"
+                                                                min="1"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div className="md:col-span-2">
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Features (comma separated)</label>
+                                                            <textarea
+                                                                name="features"
+                                                                value={planForm.features}
+                                                                onChange={handlePlanChange}
+                                                                rows="3"
+                                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                                placeholder="e.g., 10 users, 50GB storage, Priority support"
+                                                                required
+                                                            ></textarea>
+                                                        </div>
                                                     </div>
-                                                    <input
-                                                        type="number"
-                                                        name="price"
-                                                        value={planForm.price}
-                                                        onChange={handlePlanChange}
-                                                        className="block w-full pl-7 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                                        <span className="text-gray-500 sm:text-sm">USD</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (Days)</label>
-                                                <input
-                                                    type="number"
-                                                    name="durationDays"
-                                                    value={planForm.durationDays}
-                                                    onChange={handlePlanChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                    placeholder="e.g., 30"
-                                                    min="1"
-                                                    required
-                                                />
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Features (comma separated)</label>
-                                                <textarea
-                                                    name="features"
-                                                    value={planForm.features}
-                                                    onChange={handlePlanChange}
-                                                    rows="3"
-                                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                    placeholder="e.g., 10 users, 50GB storage, Priority support"
-                                                    required
-                                                ></textarea>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-end">
-                                            
+                                                    <div className="flex justify-end">
+
                                                     </div>
                                                     <div className="flex justify-end space-x-3 pt-2">
                                                         <button
@@ -671,15 +856,21 @@ const handleUserSubmit = (e) => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-                                            <input
-                                                type="text"
+                                            <select
                                                 name="role"
-                                                placeholder="e.g., Super_admin, company_admin"
                                                 value={userForm.role}
                                                 onChange={handleUserChange}
                                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                                                 required
-                                            />
+                                            >
+                                                <option value="">Select a role</option>
+                                                <option value="Super_admin">Super Admin</option>
+                                                <option value="company_admin">Company Admin</option>
+                                                <option value="hr_manager">HR Manager</option>
+                                                <option value="finance_manager">Finance Manager</option>
+                                                <option value="department_manager">Department Manager</option>
+                                                <option value="employee">Employee</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
@@ -758,17 +949,17 @@ const handleUserSubmit = (e) => {
                     )}
                 </main>
             </div>
-            
+
             {/* Tenant Creation Modal */}
             {showTenantForm && (
                 <div className="fixed inset-0 z-50 overflow-y-auto">
                     <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                         {/* Background overlay */}
-                        <div 
+                        <div
                             className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
                             onClick={() => setShowTenantForm(false)}
                         />
-                        
+
                         {/* Modal panel */}
                         <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">

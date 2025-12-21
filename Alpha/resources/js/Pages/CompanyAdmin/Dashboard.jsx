@@ -1,51 +1,236 @@
 import React, { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 import { usePage } from '@inertiajs/react';
-import { FiUsers, FiBriefcase, FiCalendar, FiClock, FiShield, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX } from 'react-icons/fi';
+import { FiUsers, FiBriefcase, FiCalendar, FiClock, FiShield, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX, FiCheck, FiSearch, FiEdit, FiTrash2, FiMoreVertical } from 'react-icons/fi';
 
-export default function CompanyAdminDashboard({ employees, departments, leavePolicies, attendancePolicies, roles, permissions, stats }) {
-    const [activeTab, setActiveTab] = useState("employees");
+export default function CompanyAdminDashboard({ employees = [], departments = [], leavePolicies = [], attendancePolicies = [], roles = [], permissions = [], stats }) {
+    const [activeTab, setActiveTab] = useState("dashboard");
     const [showEmployeeForm, setShowEmployeeForm] = useState(false);
     const [showDepartmentForm, setShowDepartmentForm] = useState(false);
     const [showLeavePolicyForm, setShowLeavePolicyForm] = useState(false);
     const [showAttendancePolicyForm, setShowAttendancePolicyForm] = useState(false);
     const [showRoleForm, setShowRoleForm] = useState(false);
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [editingItem, setEditingItem] = useState(null);
 
     const { auth } = usePage().props;
-    const { user } = auth;
+    const user = auth?.user || {};
 
     const getInitials = (name) => {
         return name?.split(' ').map(part => part[0]).join('').toUpperCase().substring(0, 2) || 'U';
     };
 
+    // Form States
     const [employeeForm, setEmployeeForm] = useState({
         name: "", email: "", password: "", role: "employee", department_id: "",
         hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time"
     });
 
     const [departmentForm, setDepartmentForm] = useState({ name: "", description: "", manager_id: "" });
+
     const [leavePolicyForm, setLeavePolicyForm] = useState({
         policy_name: "", leave_type: "", days_allowed_per_year: "", is_paid: true, description: "", max_consecutive_days: ""
     });
+
     const [attendancePolicyForm, setAttendancePolicyForm] = useState({
         policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8
     });
+
     const [roleForm, setRoleForm] = useState({ name: "", display_name: "", description: "", permissions: [] });
 
+    // Handlers
     const handleEmployeeChange = (e) => setEmployeeForm({ ...employeeForm, [e.target.name]: e.target.value });
     const handleDepartmentChange = (e) => setDepartmentForm({ ...departmentForm, [e.target.name]: e.target.value });
-    const handleLeavePolicyChange = (e) => setLeavePolicyForm({ ...leavePolicyForm, [e.target.name]: e.target.value });
+    const handleLeavePolicyChange = (e) => {
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        setLeavePolicyForm({ ...leavePolicyForm, [e.target.name]: value });
+    };
     const handleAttendancePolicyChange = (e) => setAttendancePolicyForm({ ...attendancePolicyForm, [e.target.name]: e.target.value });
     const handleRoleChange = (e) => setRoleForm({ ...roleForm, [e.target.name]: e.target.value });
 
-    const handleEmployeeSubmit = (e) => { e.preventDefault(); Inertia.post(route('company-admin.employees.store'), employeeForm); setShowEmployeeForm(false); };
-    const handleDepartmentSubmit = (e) => { e.preventDefault(); Inertia.post(route('company-admin.departments.store'), departmentForm); setShowDepartmentForm(false); };
-    const handleLeavePolicySubmit = (e) => { e.preventDefault(); Inertia.post(route('company-admin.leave-policies.store'), leavePolicyForm); setShowLeavePolicyForm(false); };
-    const handleAttendancePolicySubmit = (e) => { e.preventDefault(); Inertia.post(route('company-admin.attendance-policies.store'), attendancePolicyForm); setShowAttendancePolicyForm(false); };
-    const handleRoleSubmit = (e) => { e.preventDefault(); Inertia.post(route('company-admin.roles.store'), roleForm); setShowRoleForm(false); };
+    const handlePermissionToggle = (permissionId) => {
+        const current = roleForm.permissions || [];
+        const updated = current.includes(permissionId)
+            ? current.filter(id => id !== permissionId)
+            : [...current, permissionId];
+        setRoleForm({ ...roleForm, permissions: updated });
+    };
+
+    // Edit Handlers
+    const handleEditEmployee = (emp) => {
+        setEditingItem(emp);
+        setEmployeeForm({
+            name: emp.user?.name || "",
+            email: emp.user?.email || "",
+            password: "", // Don't prefill password
+            role: emp.user?.role || "employee",
+            department_id: emp.department_id || "",
+            hire_date: emp.hire_date || "",
+            job_title: emp.job_title || "",
+            employee_code: emp.employee_code || "",
+            phone: emp.phone || "",
+            salary: emp.salary || "",
+            employment_type: emp.employment_type || "full_time"
+        });
+        setShowEmployeeForm(true);
+    };
+
+    const handleEditDepartment = (dept) => {
+        setEditingItem(dept);
+        setDepartmentForm({
+            name: dept.name,
+            description: dept.description || "",
+            manager_id: dept.manager_id || ""
+        });
+        setShowDepartmentForm(true);
+    };
+
+    const handleEditLeavePolicy = (policy) => {
+        setEditingItem(policy);
+        setLeavePolicyForm({
+            policy_name: policy.policy_name,
+            leave_type: policy.leave_type,
+            days_allowed_per_year: policy.days_allowed_per_year,
+            is_paid: policy.is_paid,
+            description: policy.description || "",
+            max_consecutive_days: policy.max_consecutive_days || ""
+        });
+        setShowLeavePolicyForm(true);
+    };
+
+    const handleEditAttendancePolicy = (policy) => {
+        setEditingItem(policy);
+        setAttendancePolicyForm({
+            policy_name: policy.policy_name,
+            work_start_time: policy.work_start_time,
+            work_end_time: policy.work_end_time,
+            grace_period_minutes: policy.grace_period_minutes,
+            minimum_work_hours: policy.minimum_work_hours
+        });
+        setShowAttendancePolicyForm(true);
+    };
+
+    const handleEditRole = (role) => {
+        setEditingItem(role);
+        setRoleForm({
+            name: role.name,
+            display_name: role.display_name,
+            description: role.description || "",
+            permissions: role.permissions?.map(p => p.id) || []
+        });
+        setShowRoleForm(true);
+    };
+
+    // Delete Handlers
+    const handleDelete = (id, type) => {
+        if (confirm(`Are you sure you want to delete this ${type}?`)) {
+            let url = "";
+            if (type === "employee") url = route('company-admin.employees.destroy', id);
+            if (type === "department") url = route('company-admin.departments.destroy', id);
+            if (type === "leave policy") url = route('company-admin.leave-policies.destroy', id);
+            if (type === "attendance policy") url = route('company-admin.attendance-policies.destroy', id);
+            if (type === "role") url = route('company-admin.roles.destroy', id);
+
+            Inertia.delete(url);
+        }
+    };
+
+    // Submit Handlers
+    const handleEmployeeSubmit = (e) => {
+        e.preventDefault();
+        const url = editingItem
+            ? route('company-admin.employees.update', editingItem.id)
+            : route('company-admin.employees.store');
+
+        const method = editingItem ? 'put' : 'post';
+
+        Inertia[method](url, employeeForm, {
+            onSuccess: () => {
+                setShowEmployeeForm(false);
+                setEditingItem(null);
+                setEmployeeForm({
+                    name: "", email: "", password: "", role: "employee", department_id: "",
+                    hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time"
+                });
+            }
+        });
+    };
+
+    const handleDepartmentSubmit = (e) => {
+        e.preventDefault();
+        const url = editingItem
+            ? route('company-admin.departments.update', editingItem.id)
+            : route('company-admin.departments.store');
+
+        const method = editingItem ? 'put' : 'post';
+
+        Inertia[method](url, departmentForm, {
+            onSuccess: () => {
+                setShowDepartmentForm(false);
+                setEditingItem(null);
+                setDepartmentForm({ name: "", description: "", manager_id: "" });
+            }
+        });
+    };
+
+    const handleLeavePolicySubmit = (e) => {
+        e.preventDefault();
+        const url = editingItem
+            ? route('company-admin.leave-policies.update', editingItem.id)
+            : route('company-admin.leave-policies.store');
+
+        const method = editingItem ? 'put' : 'post';
+
+        Inertia[method](url, leavePolicyForm, {
+            onSuccess: () => {
+                setShowLeavePolicyForm(false);
+                setEditingItem(null);
+                setLeavePolicyForm({
+                    policy_name: "", leave_type: "", days_allowed_per_year: "", is_paid: true, description: "", max_consecutive_days: ""
+                });
+            }
+        });
+    };
+
+    const handleAttendancePolicySubmit = (e) => {
+        e.preventDefault();
+        const url = editingItem
+            ? route('company-admin.attendance-policies.update', editingItem.id)
+            : route('company-admin.attendance-policies.store');
+
+        const method = editingItem ? 'put' : 'post';
+
+        Inertia[method](url, attendancePolicyForm, {
+            onSuccess: () => {
+                setShowAttendancePolicyForm(false);
+                setEditingItem(null);
+                setAttendancePolicyForm({
+                    policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8
+                });
+            }
+        });
+    };
+
+    const handleRoleSubmit = (e) => {
+        e.preventDefault();
+        const url = editingItem
+            ? route('company-admin.roles.update', editingItem.id)
+            : route('company-admin.roles.store');
+
+        const method = editingItem ? 'put' : 'post';
+
+        Inertia[method](url, roleForm, {
+            onSuccess: () => {
+                setShowRoleForm(false);
+                setEditingItem(null);
+                setRoleForm({ name: "", display_name: "", description: "", permissions: [] });
+            }
+        });
+    };
 
     const tabs = [
+        { key: "dashboard", label: "Dashboard", icon: <FiBriefcase className="mr-2" /> },
         { key: "employees", label: "Staff Management", icon: <FiUsers className="mr-2" /> },
         { key: "departments", label: "Departments", icon: <FiBriefcase className="mr-2" /> },
         { key: "leave", label: "Leave Policies", icon: <FiCalendar className="mr-2" /> },
@@ -55,131 +240,231 @@ export default function CompanyAdminDashboard({ employees, departments, leavePol
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+            {/* Header */}
             <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-                            Company Admin Dashboard
-                        </h1>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+                                Company Admin Portal
+                            </h1>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage your organization's workforce</p>
+                        </div>
                         <div className="relative">
                             <button onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                                className="flex items-center space-x-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
-                                <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-white font-medium shadow-lg">
                                     {getInitials(user?.name)}
                                 </div>
-                                <div className="text-left">
-                                    <div className="text-sm font-medium">{user?.name}</div>
-                                    <div className="text-xs text-gray-500">{user?.email}</div>
+                                <div className="text-left hidden md:block">
+                                    <div className="text-sm font-semibold">{user?.name}</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</div>
                                 </div>
                                 <FiChevronDown className="h-4 w-4" />
                             </button>
                             {showProfileDropdown && (
-                                <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
-                                    <div className="py-1">
-                                        <a href={route('profile.edit')} className="flex items-center px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
-                                            <FiUser className="mr-3 h-5 w-5" /> Profile
-                                        </a>
-                                        <button onClick={() => Inertia.post(route('logout'))}
-                                            className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                            <FiLogOut className="mr-3 h-5 w-5" /> Sign out
-                                        </button>
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowProfileDropdown(false)} />
+                                    <div className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
+                                        <div className="py-1">
+                                            <a href={route('profile.edit')} className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                <FiUser className="mr-3 h-5 w-5 text-gray-400" /> Your Profile
+                                            </a>
+                                            <button onClick={() => Inertia.post(route('logout'))}
+                                                className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                <FiLogOut className="mr-3 h-5 w-5" /> Sign out
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
                     </div>
                 </div>
             </header>
 
-            {/* Stats Overview */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Total Employees</p>
-                                <p className="text-2xl font-bold">{stats.total_employees}</p>
+                {/* Stats Overview for Dashboard Tab */}
+                {activeTab === "dashboard" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm mb-1">Total Employees</p>
+                                    <p className="text-4xl font-bold">{stats?.total_employees || 0}</p>
+                                </div>
+                                <div className="p-3 bg-white/20 rounded-lg">
+                                    <FiUsers className="h-8 w-8" />
+                                </div>
                             </div>
-                            <FiUsers className="h-10 w-10 text-blue-500" />
                         </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Active Staff</p>
-                                <p className="text-2xl font-bold text-green-600">{stats.active_employees}</p>
-                            </div>
-                            <FiUsers className="h-10 w-10 text-green-500" />
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Departments</p>
-                                <p className="text-2xl font-bold">{stats.total_departments}</p>
-                            </div>
-                            <FiBriefcase className="h-10 w-10 text-purple-500" />
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Roles</p>
-                                <p className="text-2xl font-bold">{stats.total_roles}</p>
-                            </div>
-                            <FiShield className="h-10 w-10 text-orange-500" />
-                        </div>
-                    </div>
-                </div>
 
-                <div className="flex">
-                    <aside className="w-64 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 mr-6 h-fit">
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm mb-1">Active Staff</p>
+                                    <p className="text-4xl font-bold">{stats?.active_employees || 0}</p>
+                                </div>
+                                <div className="p-3 bg-white/20 rounded-lg">
+                                    <FiCheck className="h-8 w-8" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm mb-1">Departments</p>
+                                    <p className="text-4xl font-bold">{stats?.total_departments || 0}</p>
+                                </div>
+                                <div className="p-3 bg-white/20 rounded-lg">
+                                    <FiBriefcase className="h-8 w-8" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm mb-1">Custom Roles</p>
+                                    <p className="text-4xl font-bold">{stats?.total_roles || 0}</p>
+                                </div>
+                                <div className="p-3 bg-white/20 rounded-lg">
+                                    <FiShield className="h-8 w-8" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* Sidebar */}
+                    <aside className="w-full md:w-64 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 h-fit">
                         <nav className="space-y-1">
                             {tabs.map((tab) => (
                                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                                        activeTab === tab.key ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all ${activeTab === tab.key
+                                        ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md transform scale-105'
                                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
-                                    }`}>
+                                        }`}>
                                     {tab.icon} {tab.label}
                                 </button>
                             ))}
                         </nav>
                     </aside>
 
+                    {/* Main Content */}
                     <main className="flex-1">
-                        {/* Employees Tab */}
-                        {activeTab === "employees" && (
+                        {/* Dashboard Tab */}
+                        {activeTab === "dashboard" && (
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <h2 className="text-2xl font-bold">Staff Management</h2>
-                                    <button onClick={() => setShowEmployeeForm(true)}
-                                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
-                                        <FiPlus className="mr-2" /> Add Employee
-                                    </button>
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <button onClick={() => { setActiveTab("employees"); setShowEmployeeForm(true); }}
+                                            className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group">
+                                            <FiPlus className="h-8 w-8 mx-auto mb-2 text-gray-400 group-hover:text-blue-500" />
+                                            <p className="text-sm font-medium">Add Employee</p>
+                                        </button>
+                                        <button onClick={() => { setActiveTab("departments"); setShowDepartmentForm(true); }}
+                                            className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-purple-500 dark:hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all group">
+                                            <FiPlus className="h-8 w-8 mx-auto mb-2 text-gray-400 group-hover:text-purple-500" />
+                                            <p className="text-sm font-medium">Add Department</p>
+                                        </button>
+                                        <button onClick={() => { setActiveTab("roles"); setShowRoleForm(true); }}
+                                            className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-orange-500 dark:hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all group">
+                                            <FiPlus className="h-8 w-8 mx-auto mb-2 text-gray-400 group-hover:text-orange-500" />
+                                            <p className="text-sm font-medium">Add Role</p>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                        <thead className="bg-gray-50 dark:bg-gray-700/50">
+
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-xl font-bold mb-4">Recent Employees</h3>
+                                    <div className="space-y-3">
+                                        {employees?.slice(0, 5).map((emp) => (
+                                            <div key={emp.id} className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                                                        {getInitials(emp.user?.name)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold">{emp.user?.name}</p>
+                                                        <p className="text-sm text-gray-500 dark:text-gray-400">{emp.job_title}</p>
+                                                    </div>
+                                                </div>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${emp.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800'
+                                                    }`}>{emp.status}</span>
+                                            </div>
+                                        ))}
+                                        {(!employees || employees.length === 0) && (
+                                            <div className="text-center py-12">
+                                                <FiUsers className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                                                <p className="text-gray-500 dark:text-gray-400">No employees yet. Add your first employee to get started!</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Staff Management Tab */}
+                        {activeTab === "employees" && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <h3 className="text-xl font-bold">Staff Directory</h3>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="relative">
+                                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                            <input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 w-full md:w-64" />
+                                        </div>
+                                        <button onClick={() => { setEditingItem(null); setEmployeeForm({ name: "", email: "", password: "", role: "employee", department_id: "", hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time" }); setShowEmployeeForm(true); }}
+                                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-sm">
+                                            <FiPlus className="mr-2" /> Add Employee
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500 dark:text-gray-400">
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Department</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Job Title</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                                                <th className="px-6 py-4 font-semibold">Employee</th>
+                                                <th className="px-6 py-4 font-semibold">Department</th>
+                                                <th className="px-6 py-4 font-semibold">Contact</th>
+                                                <th className="px-6 py-4 font-semibold">Joining Date</th>
+                                                <th className="px-6 py-4 font-semibold">Status</th>
+                                                <th className="px-6 py-4 font-semibold text-right">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {employees?.map((emp) => (
-                                                <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                                    <td className="px-6 py-4 text-sm font-medium">{emp.user?.name}</td>
-                                                    <td className="px-6 py-4 text-sm">{emp.user?.email}</td>
-                                                    <td className="px-6 py-4 text-sm">{emp.department?.name || 'N/A'}</td>
-                                                    <td className="px-6 py-4 text-sm">{emp.job_title}</td>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {employees?.filter(e => e.user?.name.toLowerCase().includes(searchTerm.toLowerCase())).map((emp) => (
+                                                <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center">
+                                                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold mr-3 uppercase">
+                                                                {getInitials(emp.user?.name)}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold">{emp.user?.name}</p>
+                                                                <p className="text-xs text-gray-500">{emp.job_title}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm">{emp.department?.name || 'Unassigned'}</td>
                                                     <td className="px-6 py-4 text-sm">
-                                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                                            emp.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                                        }`}>{emp.status}</span>
+                                                        <p>{emp.user?.email}</p>
+                                                        <p className="text-gray-500">{emp.phone}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm">{new Date(emp.hire_date).toLocaleDateString()}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${emp.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                            {emp.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button onClick={() => handleEditEmployee(emp)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><FiEdit /></button>
+                                                        <button onClick={() => handleDelete(emp.id, 'employee')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><FiTrash2 /></button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -189,16 +474,585 @@ export default function CompanyAdminDashboard({ employees, departments, leavePol
                             </div>
                         )}
 
-                        {/* Other tabs coming soon message */}
-                        {activeTab !== "employees" && (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
-                                <h3 className="text-lg font-semibold mb-2">{tabs.find(t => t.key === activeTab)?.label}</h3>
-                                <p className="text-gray-600 dark:text-gray-400">This section is under construction. Use the forms above to add items.</p>
+                        {/* Departments Tab */}
+                        {activeTab === "departments" && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold">Departments</h3>
+                                    <button onClick={() => { setEditingItem(null); setDepartmentForm({ name: "", description: "", manager_id: "" }); setShowDepartmentForm(true); }}
+                                        className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-sm">
+                                        <FiPlus className="mr-2" /> Add Department
+                                    </button>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
+                                            <tr>
+                                                <th className="px-6 py-4">Name</th>
+                                                <th className="px-6 py-4">Manager</th>
+                                                <th className="px-6 py-4">Description</th>
+                                                <th className="px-6 py-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {departments?.map((dept) => (
+                                                <tr key={dept.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                    <td className="px-6 py-4 font-semibold">{dept.name}</td>
+                                                    <td className="px-6 py-4 text-sm">{dept.manager?.name || 'No Manager'}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">{dept.description}</td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button onClick={() => handleEditDepartment(dept)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><FiEdit /></button>
+                                                        <button onClick={() => handleDelete(dept.id, 'department')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><FiTrash2 /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Leave Policies Tab */}
+                        {activeTab === "leave" && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold">Leave Policies</h3>
+                                    <button onClick={() => { setEditingItem(null); setLeavePolicyForm({ policy_name: "", leave_type: "", days_allowed_per_year: "", is_paid: true, description: "", max_consecutive_days: "" }); setShowLeavePolicyForm(true); }}
+                                        className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg">
+                                        <FiPlus className="mr-2" /> Add Policy
+                                    </button>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
+                                            <tr>
+                                                <th className="px-6 py-4">Policy Name</th>
+                                                <th className="px-6 py-4">Type</th>
+                                                <th className="px-6 py-4">Allowance</th>
+                                                <th className="px-6 py-4">Paid</th>
+                                                <th className="px-6 py-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {leavePolicies?.map((policy) => (
+                                                <tr key={policy.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                    <td className="px-6 py-4 font-semibold">{policy.policy_name}</td>
+                                                    <td className="px-6 py-4 capitalize">{policy.leave_type}</td>
+                                                    <td className="px-6 py-4">{policy.days_allowed_per_year} Days/Year</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${policy.is_paid ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                                                            {policy.is_paid ? 'Yes' : 'No'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button onClick={() => handleEditLeavePolicy(policy)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><FiEdit /></button>
+                                                        <button onClick={() => handleDelete(policy.id, 'leave policy')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><FiTrash2 /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Attendance Policies Tab */}
+                        {activeTab === "attendance" && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold">Attendance Policies</h3>
+                                    <button onClick={() => { setEditingItem(null); setAttendancePolicyForm({ policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8 }); setShowAttendancePolicyForm(true); }}
+                                        className="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-sm">
+                                        <FiPlus className="mr-2" /> Add Policy
+                                    </button>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
+                                            <tr>
+                                                <th className="px-6 py-4">Policy Name</th>
+                                                <th className="px-6 py-4">Work Hours</th>
+                                                <th className="px-6 py-4">Grace Period</th>
+                                                <th className="px-6 py-4">Min. Hours</th>
+                                                <th className="px-6 py-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {attendancePolicies?.map((policy) => (
+                                                <tr key={policy.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                    <td className="px-6 py-4 font-semibold">{policy.policy_name}</td>
+                                                    <td className="px-6 py-4 text-sm">{policy.work_start_time} - {policy.work_end_time}</td>
+                                                    <td className="px-6 py-4 text-sm">{policy.grace_period_minutes} Mins</td>
+                                                    <td className="px-6 py-4 text-sm">{policy.minimum_work_hours} Hours</td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button onClick={() => handleEditAttendancePolicy(policy)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><FiEdit /></button>
+                                                        <button onClick={() => handleDelete(policy.id, 'attendance policy')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><FiTrash2 /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Roles Tab */}
+                        {activeTab === "roles" && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold">Roles & Permissions</h3>
+                                    <button onClick={() => { setEditingItem(null); setRoleForm({ name: "", display_name: "", description: "", permissions: [] }); setShowRoleForm(true); }}
+                                        className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-sm">
+                                        <FiPlus className="mr-2" /> Add Role
+                                    </button>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
+                                            <tr>
+                                                <th className="px-6 py-4">Role Name</th>
+                                                <th className="px-6 py-4">Permissions Count</th>
+                                                <th className="px-6 py-4">Description</th>
+                                                <th className="px-6 py-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            {roles?.map((role) => (
+                                                <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                    <td className="px-6 py-4 font-semibold">{role.display_name}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs font-bold ring-1 ring-red-200">
+                                                            {role.permissions?.length || 0} Permissions
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500 italic max-w-xs truncate">{role.description}</td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button onClick={() => handleEditRole(role)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><FiEdit /></button>
+                                                        <button onClick={() => handleDelete(role.id, 'role')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><FiTrash2 /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
                     </main>
                 </div>
             </div>
+
+            {/* Employee Form Modal */}
+            {showEmployeeForm && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setShowEmployeeForm(false)} />
+
+                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full mx-auto p-6 sm:p-8">
+                            <button onClick={() => setShowEmployeeForm(false)}
+                                className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                <FiX className="h-6 w-6" />
+                            </button>
+
+                            <h3 className="text-2xl font-bold mb-6">{editingItem ? 'Edit Employee' : 'Add New Employee'}</h3>
+
+                            <form onSubmit={handleEmployeeSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Name */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Full Name *</label>
+                                        <input type="text" name="name" value={employeeForm.name} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                            placeholder="John Doe" required />
+                                    </div>
+
+                                    {/* Email */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Email *</label>
+                                        <input type="email" name="email" value={employeeForm.email} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                            placeholder="john@company.com" required />
+                                    </div>
+
+                                    {/* Password */}
+                                    {!editingItem && (
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Password *</label>
+                                            <input type="password" name="password" value={employeeForm.password} onChange={handleEmployeeChange}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                                placeholder="Min. 8 characters" required minLength="8" />
+                                        </div>
+                                    )}
+
+                                    {/* Employee Code */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Employee Code *</label>
+                                        <input type="text" name="employee_code" value={employeeForm.employee_code} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                            placeholder="EMP001" required />
+                                    </div>
+
+                                    {/* Job Title */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Job Title *</label>
+                                        <input type="text" name="job_title" value={employeeForm.job_title} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                            placeholder="Software Engineer" required />
+                                    </div>
+
+                                    {/* Department */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Department</label>
+                                        <select name="department_id" value={employeeForm.department_id} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700">
+                                            <option value="">Select Department</option>
+                                            {departments.map(dept => (
+                                                <option key={dept.id} value={dept.id}>{dept.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Role */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Role *</label>
+                                        <select name="role" value={employeeForm.role} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700" required>
+                                            <option value="employee">Employee</option>
+                                            <option value="hr_manager">HR Manager</option>
+                                            <option value="finance_manager">Finance Manager</option>
+                                            <option value="department_manager">Department Manager</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Employment Type */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Employment Type *</label>
+                                        <select name="employment_type" value={employeeForm.employment_type} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700" required>
+                                            <option value="full_time">Full Time</option>
+                                            <option value="part_time">Part Time</option>
+                                            <option value="contract">Contract</option>
+                                            <option value="intern">Intern</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Hire Date */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Hire Date *</label>
+                                        <input type="date" name="hire_date" value={employeeForm.hire_date} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700" required />
+                                    </div>
+
+                                    {/* Phone */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Phone</label>
+                                        <input type="tel" name="phone" value={employeeForm.phone} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                            placeholder="+1234567890" />
+                                    </div>
+
+                                    {/* Salary */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Salary</label>
+                                        <input type="number" name="salary" value={employeeForm.salary} onChange={handleEmployeeChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                                            placeholder="50000" step="0.01" />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button type="button" onClick={() => setShowEmployeeForm(false)}
+                                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all">
+                                        {editingItem ? 'Update Employee' : 'Create Employee'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Department Form Modal */}
+            {showDepartmentForm && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDepartmentForm(false)} />
+
+                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-8">
+                            <button onClick={() => setShowDepartmentForm(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <FiX className="h-6 w-6" />
+                            </button>
+
+                            <h3 className="text-2xl font-bold mb-6">{editingItem ? 'Edit Department' : 'Add New Department'}</h3>
+
+                            <form onSubmit={handleDepartmentSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Department Name *</label>
+                                    <input type="text" name="name" value={departmentForm.name} onChange={handleDepartmentChange}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700"
+                                        placeholder="Engineering" required />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Description</label>
+                                    <textarea name="description" value={departmentForm.description} onChange={handleDepartmentChange}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700"
+                                        placeholder="Department responsibilities..." rows="3" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Department Manager</label>
+                                    <select name="manager_id" value={departmentForm.manager_id} onChange={handleDepartmentChange}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700">
+                                        <option value="">Select Manager (Optional)</option>
+                                        {employees.map(emp => (
+                                            <option key={emp.user?.id} value={emp.user?.id}>{emp.user?.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button type="button" onClick={() => setShowDepartmentForm(false)}
+                                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md">
+                                        {editingItem ? 'Update Department' : 'Create Department'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Leave Policy Form Modal */}
+            {showLeavePolicyForm && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowLeavePolicyForm(false)} />
+
+                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-8">
+                            <button onClick={() => setShowLeavePolicyForm(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <FiX className="h-6 w-6" />
+                            </button>
+
+                            <h3 className="text-2xl font-bold mb-6">{editingItem ? 'Edit Leave Policy' : 'Add Leave Policy'}</h3>
+
+                            <form onSubmit={handleLeavePolicySubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Policy Name *</label>
+                                        <input type="text" name="policy_name" value={leavePolicyForm.policy_name} onChange={handleLeavePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
+                                            placeholder="Annual Vacation" required />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Leave Type *</label>
+                                        <select name="leave_type" value={leavePolicyForm.leave_type} onChange={handleLeavePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700" required>
+                                            <option value="">Select Type</option>
+                                            <option value="sick">Sick Leave</option>
+                                            <option value="vacation">Vacation</option>
+                                            <option value="personal">Personal Leave</option>
+                                            <option value="maternity">Maternity Leave</option>
+                                            <option value="paternity">Paternity Leave</option>
+                                            <option value="unpaid">Unpaid Leave</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Days per Year *</label>
+                                        <input type="number" name="days_allowed_per_year" value={leavePolicyForm.days_allowed_per_year} onChange={handleLeavePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
+                                            placeholder="20" min="1" required />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Max Consecutive Days</label>
+                                        <input type="number" name="max_consecutive_days" value={leavePolicyForm.max_consecutive_days} onChange={handleLeavePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
+                                            placeholder="10" min="1" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" name="is_paid" checked={leavePolicyForm.is_paid} onChange={handleLeavePolicyChange}
+                                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500" />
+                                        <span className="text-sm font-medium">This is a paid leave</span>
+                                    </label>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Description</label>
+                                    <textarea name="description" value={leavePolicyForm.description} onChange={handleLeavePolicyChange}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
+                                        placeholder="Policy details..." rows="3" />
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button type="button" onClick={() => setShowLeavePolicyForm(false)}
+                                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md">
+                                        {editingItem ? 'Update Policy' : 'Create Policy'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Attendance Policy Form Modal */}
+            {showAttendancePolicyForm && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAttendancePolicyForm(false)} />
+
+                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-8">
+                            <button onClick={() => setShowAttendancePolicyForm(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <FiX className="h-6 w-6" />
+                            </button>
+
+                            <h3 className="text-2xl font-bold mb-6">{editingItem ? 'Edit Attendance Policy' : 'Add Attendance Policy'}</h3>
+
+                            <form onSubmit={handleAttendancePolicySubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Policy Name *</label>
+                                    <input type="text" name="policy_name" value={attendancePolicyForm.policy_name} onChange={handleAttendancePolicyChange}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
+                                        placeholder="Standard Office Hours" required />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Work Start Time *</label>
+                                        <input type="time" name="work_start_time" value={attendancePolicyForm.work_start_time} onChange={handleAttendancePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700" required />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Work End Time *</label>
+                                        <input type="time" name="work_end_time" value={attendancePolicyForm.work_end_time} onChange={handleAttendancePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700" required />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Grace Period (minutes)</label>
+                                        <input type="number" name="grace_period_minutes" value={attendancePolicyForm.grace_period_minutes} onChange={handleAttendancePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
+                                            placeholder="15" min="0" />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Minimum Work Hours</label>
+                                        <input type="number" name="minimum_work_hours" value={attendancePolicyForm.minimum_work_hours} onChange={handleAttendancePolicyChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
+                                            placeholder="8" min="1" />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button type="button" onClick={() => setShowAttendancePolicyForm(false)}
+                                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-md">
+                                        {editingItem ? 'Update Policy' : 'Create Policy'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Role Form Modal */}
+            {showRoleForm && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRoleForm(false)} />
+
+                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full p-8 max-h-[90vh] overflow-y-auto">
+                            <button onClick={() => setShowRoleForm(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 z-10">
+                                <FiX className="h-6 w-6" />
+                            </button>
+
+                            <h3 className="text-2xl font-bold mb-6">{editingItem ? 'Edit Role' : 'Add New Role'}</h3>
+
+                            <form onSubmit={handleRoleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Role Name (slug) *</label>
+                                        <input type="text" name="name" value={roleForm.name} onChange={handleRoleChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700"
+                                            placeholder="senior_manager" required />
+                                        <p className="text-xs text-gray-500 mt-1">Use lowercase with underscores</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Display Name *</label>
+                                        <input type="text" name="display_name" value={roleForm.display_name} onChange={handleRoleChange}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700"
+                                            placeholder="Senior Manager" required />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Description</label>
+                                    <textarea name="description" value={roleForm.description} onChange={handleRoleChange}
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700"
+                                        placeholder="Role responsibilities..." rows="3" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium mb-3">Permissions</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-4 border border-gray-300 dark:border-gray-600 rounded-lg">
+                                        {permissions && permissions.length > 0 ? (
+                                            permissions.map(permission => (
+                                                <label key={permission.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={roleForm.permissions.includes(permission.id)}
+                                                        onChange={() => handlePermissionToggle(permission.id)}
+                                                        className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                                    />
+                                                    <span className="text-sm">{permission.name}</span>
+                                                </label>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500 col-span-2 text-center py-4">
+                                                No permissions available. Please create permissions first.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button type="button" onClick={() => setShowRoleForm(false)}
+                                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        Cancel
+                                    </button>
+                                    <button type="submit"
+                                        className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md">
+                                        {editingItem ? 'Update Role' : 'Create Role'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

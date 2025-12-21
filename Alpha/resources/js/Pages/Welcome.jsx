@@ -79,7 +79,7 @@ const testimonials = [
 function LoginForm({ onClose }) {
     const { data, setData, post, processing, errors, reset } = useForm({
 
-        tenant_id: localStorage.getItem('login_tenant') || '',   
+        tenant_id: localStorage.getItem('login_tenant') || '',
         email: localStorage.getItem('login_email') || '',
         password: '',
         role: localStorage.getItem('login_role') || 'employee',
@@ -97,7 +97,7 @@ function LoginForm({ onClose }) {
 
     const submit = (e) => {
         e.preventDefault();
-        
+
         post(route('login'), {
             preserveScroll: true,
             onSuccess: () => {
@@ -122,13 +122,13 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(false);
     const [scrolled, setScrolled] = useState(false);
-    
+
     // Check URL for modal state on initial load
     const [activeModal, setActiveModal] = useState(() => {
         const params = new URLSearchParams(window.location.search);
         return params.get('modal') || '';
     });
-    
+
     // Update URL when modal state changes
     const setModal = (modalName) => {
         const url = new URL(window.location);
@@ -140,7 +140,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
         window.history.pushState({}, '', url);
         setActiveModal(modalName);
     };
-    
+
     // Handle browser back/forward navigation
     useEffect(() => {
         const handlePopState = () => {
@@ -160,7 +160,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
     const closeLoginModal = () => {
         setModal('');
     };
-    
+
     // Login form state
     const { data, setData, post, processing, errors, reset } = useForm({
         tenant_id: '',
@@ -195,7 +195,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
         <div className={`min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all duration-300 ${activeModal === 'login' ? 'overflow-hidden' : ''} relative`}>
             {/* Blur overlay for main content */}
             {activeModal === 'login' && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/30 backdrop-blur-sm z-30 transition-opacity duration-300"
                     onClick={closeLoginModal}
                 />
@@ -204,7 +204,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
 
             {/* Login Modal */}
             {activeModal === 'login' && (
-                <div 
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) {
@@ -212,11 +212,11 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         }
                     }}
                 >
-                    <div 
+                    <div
                         className="w-full max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-300"
                         onClick={(e) => e.stopPropagation()} // Prevent click from closing when clicking inside modal
                     >
-                       
+
 
                         <button onClick={closeLoginModal} className="absolute right-3 top-3 z-10 rounded-full bg-white dark:bg-gray-700 p-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none transition-colors duration-200">
                             <FiX className="h-6 w-6" />
@@ -231,142 +231,146 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                     <p className="mt-2 text-gray-600 dark:text-gray-300 text-base md:text-lg">Sign in to your account</p>
                                 </div>
 
-                               <form onSubmit={submit} className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-4">
-            <div>
-                <InputLabel 
-                    htmlFor="tenant_id" 
-                    value="Tenant ID" 
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300" 
-                />
-                 <div className="relative">
-                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
-                        <FiBriefcase />
-                    </span>
-                <TextInput
-                    id="tenant_id"
-                    type="text"
-                    name="tenant_id"
-                    value={data.tenant_id}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
-                    autoComplete="off"
-                    onChange={(e) => setData('tenant_id', e.target.value)}
-                />
-                </div>
-                <InputError message={errors.tenant_id} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-            </div>
+                                <form onSubmit={submit} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Left Column */}
+                                        <div className="space-y-4">
+                                            <div>
+                                                <InputLabel
+                                                    htmlFor="tenant_id"
+                                                    value="Tenant ID (Optional for Super Admin)"
+                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                                                        <FiBriefcase />
+                                                    </span>
+                                                    <TextInput
+                                                        id="tenant_id"
+                                                        type="number"
+                                                        name="tenant_id"
+                                                        value={data.tenant_id}
+                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                                                        placeholder="e.g., 1 (leave empty for Super Admin)"
+                                                        autoComplete="off"
+                                                        onChange={(e) => setData('tenant_id', e.target.value)}
+                                                    />
+                                                </div>
+                                                <InputError message={errors.tenant_id} className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    Super Admin users can leave this field empty
+                                                </p>
+                                            </div>
 
-            <div>
-                <InputLabel 
-                    htmlFor="email" 
-                    value="Email" 
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300" 
-                />
-                   <div className="relative">
-                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
-                        <FiUser />
-                    </span>
-                <TextInput
-                    id="email"
-                    type="email"
-                    name="email"
-                    value={data.email}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
-                    placeholder="your@email.com"
-                    autoComplete="username"
-                    onChange={(e) => setData('email', e.target.value)}
-                />
-                </div>
-                <InputError message={errors.email} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-            </div>
-        </div>
+                                            <div>
+                                                <InputLabel
+                                                    htmlFor="email"
+                                                    value="Email"
+                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                                                        <FiUser />
+                                                    </span>
+                                                    <TextInput
+                                                        id="email"
+                                                        type="email"
+                                                        name="email"
+                                                        value={data.email}
+                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                                                        placeholder="your@email.com"
+                                                        autoComplete="username"
+                                                        onChange={(e) => setData('email', e.target.value)}
+                                                    />
+                                                </div>
+                                                <InputError message={errors.email} className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                                            </div>
+                                        </div>
 
-        {/* Right Column */}
-        <div className="space-y-4">
-            <div>
-                <InputLabel 
-                    htmlFor="password" 
-                    value="Password" 
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300" 
-                />
-                <div className="relative">
-                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
-                        <FiLock />
-                    </span>
-                    <TextInput
-                        id="password"
-                        type="password"
-                        name="password"
-                        value={data.password}
-                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
-                        placeholder="••••••••"
-                        autoComplete="current-password"
-                        onChange={(e) => setData('password', e.target.value)}
-                    />
-                </div>
-                <InputError message={errors.password} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-            </div>
+                                        {/* Right Column */}
+                                        <div className="space-y-4">
+                                            <div>
+                                                <InputLabel
+                                                    htmlFor="password"
+                                                    value="Password"
+                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                                                        <FiLock />
+                                                    </span>
+                                                    <TextInput
+                                                        id="password"
+                                                        type="password"
+                                                        name="password"
+                                                        value={data.password}
+                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                                                        placeholder="••••••••"
+                                                        autoComplete="current-password"
+                                                        onChange={(e) => setData('password', e.target.value)}
+                                                    />
+                                                </div>
+                                                <InputError message={errors.password} className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                                            </div>
 
-            <div>
-                <InputLabel 
-                    htmlFor="role" 
-                    value="Role" 
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300" 
-                />
-                <select
-                    id="role"
-                    name="role"
-                    value={data.role}
-                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    onChange={(e) => setData('role', e.target.value)}
-                >
-                    <option value="company_admin">Company Admin</option>
-                    <option value="hr_manager">HR Manager</option>
-                    <option value="finance_manager">Finance Manager</option>
-                    <option value="department_manager">Department Manager</option>
-                    <option value="employee">Employee</option>
-                    <option value="Super_admin">Super Admin</option>
-                </select>
-                <InputError message={errors.role} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-            </div>
-        </div>
-    </div>
+                                            <div>
+                                                <InputLabel
+                                                    htmlFor="role"
+                                                    value="Role"
+                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                                />
+                                                <select
+                                                    id="role"
+                                                    name="role"
+                                                    value={data.role}
+                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                                    onChange={(e) => setData('role', e.target.value)}
+                                                >
+                                                    <option value="company_admin">Company Admin</option>
+                                                    <option value="hr_manager">HR Manager</option>
+                                                    <option value="finance_manager">Finance Manager</option>
+                                                    <option value="department_manager">Department Manager</option>
+                                                    <option value="employee">Employee</option>
+                                                    <option value="Super_admin">Super Admin</option>
+                                                </select>
+                                                <InputError message={errors.role} className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                                            </div>
+                                        </div>
+                                    </div>
 
-    {/* Remember me and Forgot Password */}
-    <div className="flex items-center justify-between mt-4">
-        <label className="flex items-center">
-            <Checkbox
-                name="remember"
-                checked={data.remember}
-                onChange={(e) => setData('remember', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-            />
-            <span className="ms-2 text-sm text-gray-600 dark:text-gray-300">Remember me</span>
-        </label>
+                                    {/* Remember me and Forgot Password */}
+                                    <div className="flex items-center justify-between mt-4">
+                                        <label className="flex items-center">
+                                            <Checkbox
+                                                name="remember"
+                                                checked={data.remember}
+                                                onChange={(e) => setData('remember', e.target.checked)}
+                                                className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                            />
+                                            <span className="ms-2 text-sm text-gray-600 dark:text-gray-300">Remember me</span>
+                                        </label>
 
-        <Link
-            href={route('password.request')}
-            className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-            Forgot password?
-        </Link>
-    </div>
+                                        <Link
+                                            href={route('password.request')}
+                                            className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                                        >
+                                            Forgot password?
+                                        </Link>
+                                    </div>
 
-    {/* Buttons */}
-    <div className="pt-2 flex space-x-4">
-       
-        <button
-            type="submit"
-            disabled={processing}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
-        >
-            <FiLogIn className="w-4 h-4 mr-2" />
-            {processing ? 'Signing in...' : 'Sign in'}
-        </button>
-    </div>
-</form>
+                                    {/* Buttons */}
+                                    <div className="pt-2 flex space-x-4">
+
+                                        <button
+                                            type="submit"
+                                            disabled={processing}
+                                            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
+                                        >
+                                            <FiLogIn className="w-4 h-4 mr-2" />
+                                            {processing ? 'Signing in...' : 'Sign in'}
+                                        </button>
+                                    </div>
+                                </form>
 
                                 <div className="mt-6 text-center text-sm">
                                     <p className="text-gray-600 dark:text-gray-400">
@@ -419,7 +423,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                 <FiLogIn className="w-4 h-4 mr-2" />
                                 Sign In
                             </button>
-                             
+
                         </div>
 
                         {/* Mobile menu button */}
@@ -441,7 +445,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
 
                     {/* Mobile Navigation */}
                     {isMenuOpen && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
@@ -465,7 +469,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                 }}
                                 className="block py-2 px-4 text-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition w-full"
                             >
-                                
+
                                 Sign In
                             </button>
                         </motion.div>
@@ -491,7 +495,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                 </div>
                 <div className="max-w-7xl mx-auto">
                     <div className="text-center">
-                        <motion.span 
+                        <motion.span
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
@@ -499,7 +503,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             Welcome to the future of HR
                         </motion.span>
-                        <motion.h1 
+                        <motion.h1
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.1 }}
@@ -507,7 +511,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             Modern HR Management for <span className="text-blue-600 dark:text-blue-400">Growing Teams</span>
                         </motion.h1>
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.2 }}
@@ -515,7 +519,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             Empower your team with intelligent workforce management, automated onboarding, and data-driven insights. Transform the way you manage people.
                         </motion.p>
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.3 }}
@@ -536,82 +540,82 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                             </a>
                         </motion.div>
                     </div>
-            <section>
-                    {/* Dashboard Section with Curved Background */}
-                    <div className="relative mt-20">
-                        {/* Curved Background */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-blue-900 to-blue-800 rounded-lg">
-                            <div className="absolute bottom-0 left-0 right-0 h-24 bg-white dark:bg-gray-900 rounded-t-[100%] transform translate-y-1/2"></div>
-                        </div>
-                        
-                        {/* Dashboard Content */}
-                        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                            <div className="text-center mb-12">
-                                <h2 className="text-3xl font-bold text-white mb-2">HRMS Dashboard</h2>
-                                <p className="text-blue-200">Key metrics and insights at your fingertips</p>
+                    <section>
+                        {/* Dashboard Section with Curved Background */}
+                        <div className="relative mt-20">
+                            {/* Curved Background */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-blue-900 to-blue-800 rounded-lg">
+                                <div className="absolute bottom-0 left-0 right-0 h-24 bg-white dark:bg-gray-900 rounded-t-[100%] transform translate-y-1/2"></div>
                             </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                {/* Card 1 */}
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4, delay: 0.2 }}
-                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
-                                >
-                                    <div className="p-6">
-                                        <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">124</div>
-                                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Total Employees</h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                                            Currently active in the organization across all 
-                                        </p>
-                                    </div>
-                                    <div className="bg-blue-50 dark:bg-gray-700 px-6 py-3 text-sm text-blue-600 dark:text-blue-400">
-                                        +12 new hires this month
-                                    </div>
-                                </motion.div>
 
-                                {/* Card 2 */}
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4, delay: 0.3 }}
-                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
-                                >
-                                    <div className="p-6">
-                                        <div className="text-4xl font-bold text-green-600 dark:text-green-400 mb-2">87%</div>
-                                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Attendance Rate</h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                                            Average daily attendance rate across all departments
-                                        </p>
-                                    </div>
-                                    <div className="bg-green-50 dark:bg-gray-700 px-6 py-3 text-sm text-green-600 dark:text-green-400">
-                                        +5% from last month
-                                    </div>
-                                </motion.div>
+                            {/* Dashboard Content */}
+                            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                                <div className="text-center mb-12">
+                                    <h2 className="text-3xl font-bold text-white mb-2">HRMS Dashboard</h2>
+                                    <p className="text-blue-200">Key metrics and insights at your fingertips</p>
+                                </div>
 
-                                {/* Card 3 */}
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4, delay: 0.4 }}
-                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
-                                >
-                                    <div className="p-6">
-                                        <div className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">24</div>
-                                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Open Positions</h3>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                                            Current job openings across various departments
-                                        </p>
-                                    </div>
-                                    <div className="bg-purple-50 dark:bg-gray-700 px-6 py-3 text-sm text-purple-600 dark:text-purple-400">
-                                        8 in Engineering, 5 in Marketing
-                                    </div>
-                                </motion.div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    {/* Card 1 */}
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.4, delay: 0.2 }}
+                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
+                                    >
+                                        <div className="p-6">
+                                            <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">124</div>
+                                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Total Employees</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                                                Currently active in the organization across all
+                                            </p>
+                                        </div>
+                                        <div className="bg-blue-50 dark:bg-gray-700 px-6 py-3 text-sm text-blue-600 dark:text-blue-400">
+                                            +12 new hires this month
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Card 2 */}
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.4, delay: 0.3 }}
+                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
+                                    >
+                                        <div className="p-6">
+                                            <div className="text-4xl font-bold text-green-600 dark:text-green-400 mb-2">87%</div>
+                                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Attendance Rate</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                                                Average daily attendance rate across all departments
+                                            </p>
+                                        </div>
+                                        <div className="bg-green-50 dark:bg-gray-700 px-6 py-3 text-sm text-green-600 dark:text-green-400">
+                                            +5% from last month
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Card 3 */}
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.4, delay: 0.4 }}
+                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
+                                    >
+                                        <div className="p-6">
+                                            <div className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">24</div>
+                                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Open Positions</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                                                Current job openings across various departments
+                                            </p>
+                                        </div>
+                                        <div className="bg-purple-50 dark:bg-gray-700 px-6 py-3 text-sm text-purple-600 dark:text-purple-400">
+                                            8 in Engineering, 5 in Marketing
+                                        </div>
+                                    </motion.div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                   </section> 
+                    </section>
                 </div>
             </section>
 
@@ -619,7 +623,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
             <section id="features" className="py-20 bg-gray-50 dark:bg-gray-900/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-16">
-                        <motion.h2 
+                        <motion.h2
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -627,7 +631,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             Everything You Need in One Place
                         </motion.h2>
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: "-50px" }}
@@ -639,7 +643,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {features.map((feature, index) => (
-                            <motion.div 
+                            <motion.div
                                 key={index}
                                 initial={{ opacity: 0, y: 30 }}
                                 whileInView={{ opacity: 1, y: 0 }}
@@ -662,7 +666,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
             <section id="pricing" className="py-20 bg-white dark:bg-gray-900">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-16">
-                        <motion.h2 
+                        <motion.h2
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -670,7 +674,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             Simple, Transparent Pricing
                         </motion.h2>
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: "-50px" }}
@@ -682,17 +686,16 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
                         {pricingPlans.map((plan, index) => (
-                            <motion.div 
+                            <motion.div
                                 key={plan.name}
                                 initial={{ opacity: 0, y: 30 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true, margin: "-50px" }}
                                 transition={{ duration: 0.4, delay: index * 0.1 }}
-                                className={`relative rounded-2xl p-8 ${
-                                    plan.featured 
-                                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg transform scale-105' 
+                                className={`relative rounded-2xl p-8 ${plan.featured
+                                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg transform scale-105'
                                         : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm border border-gray-100 dark:border-gray-700'
-                                }`}
+                                    }`}
                             >
                                 {plan.featured && (
                                     <span className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-semibold px-3 py-1 rounded-full">
@@ -714,12 +717,11 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                         </li>
                                     ))}
                                 </ul>
-                                <button 
-                                    className={`w-full py-3 px-6 rounded-lg font-medium transition ${
-                                        plan.featured 
-                                            ? 'bg-white text-blue-700 hover:bg-blue-50' 
+                                <button
+                                    className={`w-full py-3 px-6 rounded-lg font-medium transition ${plan.featured
+                                            ? 'bg-white text-blue-700 hover:bg-blue-50'
                                             : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                    }`}
+                                        }`}
                                 >
                                     {plan.cta}
                                 </button>
@@ -733,7 +735,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
             <section id="testimonials" className="py-20 bg-gray-50 dark:bg-gray-900/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-16">
-                        <motion.h2 
+                        <motion.h2
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -741,7 +743,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         >
                             Trusted by Leading Companies
                         </motion.h2>
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: "-50px" }}
@@ -753,7 +755,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {testimonials.map((testimonial, index) => (
-                            <motion.div 
+                            <motion.div
                                 key={index}
                                 initial={{ opacity: 0, y: 30 }}
                                 whileInView={{ opacity: 1, y: 0 }}
@@ -781,7 +783,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
             {/* CTA Section */}
             <section className="py-20 bg-blue-600 text-white">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                    <motion.h2 
+                    <motion.h2
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
@@ -789,7 +791,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                     >
                         Ready to transform your HR management?
                     </motion.h2>
-                    <motion.p 
+                    <motion.p
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
@@ -797,7 +799,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                     >
                         Join thousands of businesses that trust our platform to manage their HR needs.
                     </motion.p>
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: "-50px" }}
@@ -825,9 +827,9 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                             <p className="text-gray-400 mb-6">Empowering businesses with modern HR solutions.</p>
                             <div className="flex space-x-4">
                                 {['twitter', 'facebook', 'linkedin', 'github'].map((social) => (
-                                    <a 
-                                        key={social} 
-                                        href={`#`} 
+                                    <a
+                                        key={social}
+                                        href={`#`}
                                         className="text-gray-400 hover:text-white transition-colors"
                                         aria-label={social}
                                     >
@@ -837,7 +839,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                 ))}
                             </div>
                         </div>
-                        
+
                         <div>
                             <h3 className="text-white font-semibold mb-4">Product</h3>
                             <ul className="space-y-2">
@@ -850,7 +852,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                 ))}
                             </ul>
                         </div>
-                        
+
                         <div>
                             <h3 className="text-white font-semibold mb-4">Company</h3>
                             <ul className="space-y-2">
@@ -864,7 +866,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                             </ul>
                         </div>
                     </div>
-                    
+
                     <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
                         <p className="text-sm">&copy; {new Date().getFullYear()} Alpha-HRMS. All rights reserved.</p>
                         <div className="flex space-x-6 mt-4 md:mt-0">

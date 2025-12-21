@@ -38,20 +38,30 @@ Route::middleware('auth')->group(function () {
 });
 
 // -------------------
-// Tenant Routes
+// Tenant Routes (role-based dashboards)
 // -------------------
-Route::middleware(['auth', SwitchTenantDatabase::class])->group(function () {
-    Route::get('/tenant-dashboard', function () {
+Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
+	Route::get('/tenant-dashboard', function () {
+		$user = Auth::user();
+		$users = DB::connection('Tenant')->table('users')->get();
+		$tenantDb = DB::connection('Tenant')->getDatabaseName();
 
-        $users = DB::connection('Tenant')->table('users')->get();
+		// Choose dashboard component based on tenant user role
+		$component = match ($user->role) {
+			'hr_manager'         => 'Tenant/HrDashboard',
+			'finance_manager'    => 'Tenant/FinanceDashboard',
+			'department_manager' => 'Tenant/DepartmentManagerDashboard',
+			'employee'           => 'Tenant/EmployeeDashboard',
+			default              => 'Tenant/TenantDashboard',
+		};
 
-        return Inertia::render('Tenant/Dashboard', [
-            'users' => $users,
-            'tenant_db' => DB::connection('Tenant')->getDatabaseName(),
-        ]);
-    })->name('tenant.dashboard');
+		return Inertia::render($component, [
+			'user'       => $user,
+			'users'      => $users,
+			'tenant_db'  => $tenantDb,
+		]);
+	})->name('tenant.dashboard');
 });
-
 
 // -------------------
 // Super Admin Routes
@@ -60,29 +70,41 @@ Route::middleware(['auth', EnsureSuperAdmin::class])->group(function () {
     Route::get('/superadmin/tenants', [TenantController::class, 'index'])->name('tenants.index');
     Route::get('/superadmin/tenants/create', [TenantController::class, 'create'])->name('tenants.create');
     Route::post('/superadmin/tenants', [TenantController::class, 'store'])->name('tenants.store');
+    Route::put('/superadmin/tenants/{tenant}', [TenantController::class, 'update'])->name('tenants.update');
+    Route::delete('/superadmin/tenants/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
 });
 
 // -------------------
 // Company Admin Routes (Tenant-specific)
 // -------------------
-Route::middleware(['auth', SwitchTenantDatabase::class, EnsureCompanyAdmin::class])->prefix('company-admin')->name('company-admin.')->group(function () {
+Route::middleware([SwitchTenantDatabase::class, 'auth', EnsureCompanyAdmin::class])->prefix('company-admin')->name('company-admin.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [CompanyAdminController::class, 'index'])->name('dashboard');
-    
+
     // Employee Management
     Route::post('/employees', [CompanyAdminController::class, 'storeEmployee'])->name('employees.store');
-    
+    Route::put('/employees/{id}', [CompanyAdminController::class, 'updateEmployee'])->name('employees.update');
+    Route::delete('/employees/{id}', [CompanyAdminController::class, 'destroyEmployee'])->name('employees.destroy');
+
     // Department Management
     Route::post('/departments', [CompanyAdminController::class, 'storeDepartment'])->name('departments.store');
-    
+    Route::put('/departments/{id}', [CompanyAdminController::class, 'updateDepartment'])->name('departments.update');
+    Route::delete('/departments/{id}', [CompanyAdminController::class, 'destroyDepartment'])->name('departments.destroy');
+
     // Leave Policy Management
     Route::post('/leave-policies', [CompanyAdminController::class, 'storeLeavePolicy'])->name('leave-policies.store');
-    
+    Route::put('/leave-policies/{id}', [CompanyAdminController::class, 'updateLeavePolicy'])->name('leave-policies.update');
+    Route::delete('/leave-policies/{id}', [CompanyAdminController::class, 'destroyLeavePolicy'])->name('leave-policies.destroy');
+
     // Attendance Policy Management
     Route::post('/attendance-policies', [CompanyAdminController::class, 'storeAttendancePolicy'])->name('attendance-policies.store');
-    
+    Route::put('/attendance-policies/{id}', [CompanyAdminController::class, 'updateAttendancePolicy'])->name('attendance-policies.update');
+    Route::delete('/attendance-policies/{id}', [CompanyAdminController::class, 'destroyAttendancePolicy'])->name('attendance-policies.destroy');
+
     // Role Management (RBAC)
     Route::post('/roles', [CompanyAdminController::class, 'storeRole'])->name('roles.store');
+    Route::put('/roles/{id}', [CompanyAdminController::class, 'updateRole'])->name('roles.update');
+    Route::delete('/roles/{id}', [CompanyAdminController::class, 'destroyRole'])->name('roles.destroy');
 });
 
 // Show the form page (Inertia React)
@@ -125,22 +147,22 @@ Route::post('/users', [TenantController::class, 'storeuser'])
 // -------------------
 Route::get('/dashboard', function () {
     $user = Auth::user();
-    
+
     // Redirect based on user role
     if ($user->role === 'Super_admin') {
         return redirect()->route('tenants.index');
     }
-    
+
     if ($user->role === 'company_admin' && $user->tenant_id) {
         return redirect()->route('company-admin.dashboard');
     }
-    
+
     if ($user->tenant_id) {
         return redirect()->route('tenant.dashboard');
     }
-    
+
     // No dashboard access - redirect to home
     return redirect('/');
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware([SwitchTenantDatabase::class, 'auth', 'verified'])->name('dashboard');
 
 require __DIR__ . '/auth.php';
