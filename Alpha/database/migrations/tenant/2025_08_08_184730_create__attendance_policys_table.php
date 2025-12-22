@@ -20,6 +20,10 @@ return new class extends Migration
             $table->integer('late_penalty_minutes')->nullable();
             $table->boolean('requires_check_in')->default(true);
             $table->boolean('requires_check_out')->default(true);
+            $table->boolean('requires_company_wifi')->default(false);
+            $table->text('company_wifi_allowed_ips')->nullable();
+            $table->text('company_wifi_allowed_cidrs')->nullable();
+            $table->boolean('requires_fingerprint')->default(false);
             $table->integer('minimum_work_hours')->default(8);
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);

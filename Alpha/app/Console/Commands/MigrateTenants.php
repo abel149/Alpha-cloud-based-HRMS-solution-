@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Tenant;
 
 class MigrateTenants extends Command
@@ -22,7 +23,7 @@ class MigrateTenants extends Command
 
 
             // Set dynamic DB config
-            Config::set('database.connections.tenant', [
+            Config::set('database.connections.Tenant', [
                 'driver' => 'mysql',
                 'host' => env('DB_HOST', '127.0.0.1'),
                 'port' => env('DB_PORT', '3306'),
@@ -36,17 +37,66 @@ class MigrateTenants extends Command
                 'engine' => null,
             ]);
 
-            DB::purge('tenant'); // clear old connection
-            DB::reconnect('tenant');
+            DB::purge('Tenant'); // clear old connection
+            DB::reconnect('Tenant');
 
-            // Run migrations in /database/migrations/tenant
-            Artisan::call('migrate', [
-                '--path' => 'database/migrations/tenant',
-                '--database' => 'tenant',
-                '--force' => true,
-            ]);
+            $hasMigrationsTable = Schema::connection('Tenant')->hasTable('migrations');
+            $hasExistingSchema = Schema::connection('Tenant')->hasTable('employees')
+                || Schema::connection('Tenant')->hasTable('attendance_policies')
+                || Schema::connection('Tenant')->hasTable('departments');
 
-            $this->line(Artisan::output());
+            try {
+                // Preferred path: if migrations table exists, run normal tenant migrations.
+                // Laravel will only apply NEW migrations.
+                if ($hasMigrationsTable) {
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                } elseif ($hasExistingSchema) {
+                    // Legacy tenant DB with tables but without migration history: run safe additive migrations only.
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_15_000002_fix_all_tenant_tables_schema.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_22_000003_add_wifi_and_fingerprint_to_attendance_policies_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                } else {
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                }
+
+                $this->line(Artisan::output());
+            } catch (\Throwable $e) {
+                // Some tenants can have tables already created but missing migration records.
+                // Running full migrations will fail with "table already exists". Fall back to safe additive migrations.
+                $this->error("Migration failed for {$tenant->database}: {$e->getMessage()}");
+
+                try {
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_15_000002_fix_all_tenant_tables_schema.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_22_000003_add_wifi_and_fingerprint_to_attendance_policies_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+
+                    $this->line(Artisan::output());
+                } catch (\Throwable $e2) {
+                    $this->error("Fallback migration failed for {$tenant->database}: {$e2->getMessage()}");
+                }
+            }
         }
 
         $this->info("✅ All tenant migrations complete.");

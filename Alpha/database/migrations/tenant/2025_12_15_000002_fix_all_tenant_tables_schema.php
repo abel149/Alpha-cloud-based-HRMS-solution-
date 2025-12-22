@@ -88,6 +88,18 @@ return new class extends Migration
                 if (!Schema::hasColumn('attendance_policies', 'requires_check_out')) {
                     $table->boolean('requires_check_out')->default(true);
                 }
+                if (!Schema::hasColumn('attendance_policies', 'requires_company_wifi')) {
+                    $table->boolean('requires_company_wifi')->default(false);
+                }
+                if (!Schema::hasColumn('attendance_policies', 'company_wifi_allowed_ips')) {
+                    $table->text('company_wifi_allowed_ips')->nullable();
+                }
+                if (!Schema::hasColumn('attendance_policies', 'company_wifi_allowed_cidrs')) {
+                    $table->text('company_wifi_allowed_cidrs')->nullable();
+                }
+                if (!Schema::hasColumn('attendance_policies', 'requires_fingerprint')) {
+                    $table->boolean('requires_fingerprint')->default(false);
+                }
                 if (!Schema::hasColumn('attendance_policies', 'minimum_work_hours')) {
                     $table->integer('minimum_work_hours')->default(8);
                 }
