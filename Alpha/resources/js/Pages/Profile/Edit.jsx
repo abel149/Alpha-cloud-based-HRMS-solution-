@@ -9,6 +9,12 @@ export default function Edit({ mustVerifyEmail, status, auth }) {
     const [activeTab, setActiveTab] = useState('dashboard');
     const { user } = auth;
 
+    const backHref = user?.role === 'Super_admin'
+        ? '/superadmin/tenants'
+        : user?.role === 'company_admin'
+            ? route('company-admin.dashboard')
+            : route('tenant.dashboard');
+
     // Function to get user initials
     const getInitials = (name) => {
         return name
@@ -28,7 +34,7 @@ export default function Edit({ mustVerifyEmail, status, auth }) {
                     <div className="md:flex md:items-center md:justify-between mb-8">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-4">
-                                <Link href="/superadmin/tenants" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                <Link href={backHref} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
                                     <FiArrowLeft className="w-8 h-8" />
                                 </Link>
                                 <div>

@@ -10,11 +10,13 @@ use App\Http\Controllers\TenantController;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureCompanyAdmin;
 use App\Http\Controllers\CompanyAdminController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\TenantApplicationController;
 use App\Http\Controllers\SubscriptionPlanController;
 use App\Http\Controllers\SuperAdmin\SuperAdminUserController;
+use App\Models\AttendancePolicy;
 
 // -------------------
 // Public Routes
@@ -61,6 +63,82 @@ Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 			'tenant_db'  => $tenantDb,
 		]);
 	})->name('tenant.dashboard');
+
+	Route::get('/tenant/wifi-check', function (Request $request) {
+		$policy = AttendancePolicy::where('is_active', true)->orderByDesc('id')->first();
+		$requiresCompanyWifi = (bool) optional($policy)->requires_company_wifi;
+
+		// If policy doesn't require company Wi-Fi, then Wi-Fi check passes.
+		if (!$requiresCompanyWifi) {
+			return response()->json(['ok' => true, 'ip' => $request->ip(), 'policy_required' => false]);
+		}
+
+		$allowed = (string) optional($policy)->company_wifi_allowed_ips;
+		$allowedCidrs = (string) optional($policy)->company_wifi_allowed_cidrs;
+		$allowedIps = array_values(array_filter(array_map('trim', explode(',', $allowed))));
+		$cidrs = array_values(array_filter(array_map('trim', explode(',', $allowedCidrs))));
+		$ip = $request->ip();
+
+		$ipInCidr = function (string $ip, string $cidr): bool {
+			if (strpos($cidr, '/') === false) {
+				return false;
+			}
+			[$subnet, $maskBits] = explode('/', $cidr, 2);
+			$maskBits = (int) $maskBits;
+			$ipBin = @inet_pton($ip);
+			$subnetBin = @inet_pton($subnet);
+			if ($ipBin === false || $subnetBin === false) {
+				return false;
+			}
+			if (strlen($ipBin) !== strlen($subnetBin)) {
+				return false;
+			}
+
+			$bytes = intdiv($maskBits, 8);
+			$remainder = $maskBits % 8;
+
+			for ($i = 0; $i < $bytes; $i++) {
+				if ($ipBin[$i] !== $subnetBin[$i]) {
+					return false;
+				}
+			}
+			if ($remainder === 0) {
+				return true;
+			}
+			$mask = chr((0xFF << (8 - $remainder)) & 0xFF);
+			return (($ipBin[$bytes] & $mask) === ($subnetBin[$bytes] & $mask));
+		};
+
+		// If policy requires company Wi-Fi but no allowlist configured, deny by default.
+		if (count($allowedIps) === 0 && count($cidrs) === 0) {
+			return response()->json(['ok' => false, 'ip' => $ip, 'policy_required' => true, 'reason' => 'Company Wi-Fi allowlist not configured']);
+		}
+
+		$ok = in_array($ip, $allowedIps, true);
+		if (!$ok) {
+			foreach ($cidrs as $cidr) {
+				if ($ipInCidr($ip, $cidr)) {
+					$ok = true;
+					break;
+				}
+			}
+		}
+
+		return response()->json(['ok' => $ok, 'ip' => $ip, 'policy_required' => true]);
+	})->name('tenant.wifi.check');
+
+	Route::get('/tenant/attendance-policy', function () {
+		$policy = AttendancePolicy::where('is_active', true)->orderByDesc('id')->first();
+		return response()->json([
+			'ok' => true,
+			'policy' => [
+				'id' => optional($policy)->id,
+				'policy_name' => optional($policy)->policy_name,
+				'requires_company_wifi' => (bool) optional($policy)->requires_company_wifi,
+				'requires_fingerprint' => (bool) optional($policy)->requires_fingerprint,
+			],
+		]);
+	})->name('tenant.attendance.policy');
 });
 
 // -------------------
