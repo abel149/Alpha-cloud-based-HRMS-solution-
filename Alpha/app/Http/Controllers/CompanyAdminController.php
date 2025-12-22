@@ -284,6 +284,10 @@ class CompanyAdminController extends Controller
             'work_end_time' => 'required',
             'grace_period_minutes' => 'integer|min:0',
             'minimum_work_hours' => 'integer|min:1',
+            'requires_company_wifi' => 'nullable|boolean',
+            'company_wifi_allowed_ips' => 'nullable|string',
+            'company_wifi_allowed_cidrs' => 'nullable|string',
+            'requires_fingerprint' => 'nullable|boolean',
         ]);
 
         AttendancePolicy::create($request->all());
@@ -300,9 +304,23 @@ class CompanyAdminController extends Controller
             'work_end_time' => 'required',
             'grace_period_minutes' => 'integer|min:0',
             'minimum_work_hours' => 'integer|min:1',
+            'requires_company_wifi' => 'nullable|boolean',
+            'company_wifi_allowed_ips' => 'nullable|string',
+            'company_wifi_allowed_cidrs' => 'nullable|string',
+            'requires_fingerprint' => 'nullable|boolean',
         ]);
 
-        $policy->update($request->only('policy_name', 'work_start_time', 'work_end_time', 'grace_period_minutes', 'minimum_work_hours'));
+        $policy->update($request->only(
+            'policy_name',
+            'work_start_time',
+            'work_end_time',
+            'grace_period_minutes',
+            'minimum_work_hours',
+            'requires_company_wifi',
+            'company_wifi_allowed_ips',
+            'company_wifi_allowed_cidrs',
+            'requires_fingerprint'
+        ));
 
         return back()->with('success', 'Attendance policy updated successfully');
     }

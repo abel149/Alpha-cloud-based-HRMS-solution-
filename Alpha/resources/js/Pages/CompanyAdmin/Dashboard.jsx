@@ -34,7 +34,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     });
 
     const [attendancePolicyForm, setAttendancePolicyForm] = useState({
-        policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8
+        policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8,
+        requires_company_wifi: false,
+        company_wifi_allowed_ips: "",
+        company_wifi_allowed_cidrs: "",
+        requires_fingerprint: false,
     });
 
     const [roleForm, setRoleForm] = useState({ name: "", display_name: "", description: "", permissions: [] });
@@ -46,7 +50,10 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
         setLeavePolicyForm({ ...leavePolicyForm, [e.target.name]: value });
     };
-    const handleAttendancePolicyChange = (e) => setAttendancePolicyForm({ ...attendancePolicyForm, [e.target.name]: e.target.value });
+    const handleAttendancePolicyChange = (e) => {
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        setAttendancePolicyForm({ ...attendancePolicyForm, [e.target.name]: value });
+    };
     const handleRoleChange = (e) => setRoleForm({ ...roleForm, [e.target.name]: e.target.value });
 
     const handlePermissionToggle = (permissionId) => {
@@ -106,7 +113,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
             work_start_time: policy.work_start_time,
             work_end_time: policy.work_end_time,
             grace_period_minutes: policy.grace_period_minutes,
-            minimum_work_hours: policy.minimum_work_hours
+            minimum_work_hours: policy.minimum_work_hours,
+            requires_company_wifi: Boolean(policy.requires_company_wifi),
+            company_wifi_allowed_ips: policy.company_wifi_allowed_ips || "",
+            company_wifi_allowed_cidrs: policy.company_wifi_allowed_cidrs || "",
+            requires_fingerprint: Boolean(policy.requires_fingerprint),
         });
         setShowAttendancePolicyForm(true);
     };
@@ -206,7 +217,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                 setShowAttendancePolicyForm(false);
                 setEditingItem(null);
                 setAttendancePolicyForm({
-                    policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8
+                    policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8,
+                    requires_company_wifi: false,
+                    company_wifi_allowed_ips: "",
+                    company_wifi_allowed_cidrs: "",
+                    requires_fingerprint: false,
                 });
             }
         });
@@ -561,7 +576,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                                     <h3 className="text-xl font-bold">Attendance Policies</h3>
-                                    <button onClick={() => { setEditingItem(null); setAttendancePolicyForm({ policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8 }); setShowAttendancePolicyForm(true); }}
+                                    <button onClick={() => { setEditingItem(null); setAttendancePolicyForm({ policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8, requires_company_wifi: false, company_wifi_allowed_ips: "", company_wifi_allowed_cidrs: "", requires_fingerprint: false }); setShowAttendancePolicyForm(true); }}
                                         className="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-sm">
                                         <FiPlus className="mr-2" /> Add Policy
                                     </button>
@@ -958,6 +973,67 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         <input type="number" name="minimum_work_hours" value={attendancePolicyForm.minimum_work_hours} onChange={handleAttendancePolicyChange}
                                             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
                                             placeholder="8" min="1" />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+                                        <div>
+                                            <div className="font-semibold">Company Wi-Fi Restriction</div>
+                                            <div className="text-sm text-gray-500">Require employees to be on the company network to check in/out.</div>
+                                        </div>
+                                        <label className="inline-flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                name="requires_company_wifi"
+                                                checked={Boolean(attendancePolicyForm.requires_company_wifi)}
+                                                onChange={handleAttendancePolicyChange}
+                                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                            />
+                                        </label>
+                                    </div>
+
+                                    {attendancePolicyForm.requires_company_wifi && (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium mb-2">Allowed IPs (comma separated)</label>
+                                                <input
+                                                    type="text"
+                                                    name="company_wifi_allowed_ips"
+                                                    value={attendancePolicyForm.company_wifi_allowed_ips}
+                                                    onChange={handleAttendancePolicyChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
+                                                    placeholder="192.168.1.10, 192.168.1.11"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium mb-2">Allowed CIDR Ranges (comma separated)</label>
+                                                <input
+                                                    type="text"
+                                                    name="company_wifi_allowed_cidrs"
+                                                    value={attendancePolicyForm.company_wifi_allowed_cidrs}
+                                                    onChange={handleAttendancePolicyChange}
+                                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
+                                                    placeholder="192.168.1.0/24, 10.0.0.0/24"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+                                        <div>
+                                            <div className="font-semibold">Fingerprint Restriction</div>
+                                            <div className="text-sm text-gray-500">Require fingerprint verification before check in/out.</div>
+                                        </div>
+                                        <label className="inline-flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                name="requires_fingerprint"
+                                                checked={Boolean(attendancePolicyForm.requires_fingerprint)}
+                                                onChange={handleAttendancePolicyChange}
+                                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                            />
+                                        </label>
                                     </div>
                                 </div>
 
