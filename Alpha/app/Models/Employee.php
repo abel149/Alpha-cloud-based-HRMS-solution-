@@ -30,7 +30,7 @@ class Employee extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(TenantUser::class);
     }
 
     public function department(): BelongsTo
