@@ -9,7 +9,14 @@ use App\Http\Middleware\SwitchTenantDatabase;
 use App\Http\Controllers\TenantController;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureCompanyAdmin;
+use App\Http\Middleware\EnsureHrManager;
+use App\Http\Middleware\EnsureFinanceManager;
+use App\Http\Middleware\EnsureDepartmentManager;
 use App\Http\Controllers\CompanyAdminController;
+use App\Http\Controllers\TenantHrController;
+use App\Http\Controllers\TenantEmployeeController;
+use App\Http\Controllers\TenantFinanceController;
+use App\Http\Controllers\TenantDepartmentManagerController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -45,12 +52,16 @@ Route::middleware('auth')->group(function () {
 Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 	Route::get('/tenant-dashboard', function () {
 		$user = Auth::user();
+
+		if ($user->role === 'hr_manager') {
+			return redirect()->route('tenant.hr.dashboard');
+		}
+
 		$users = DB::connection('Tenant')->table('users')->get();
 		$tenantDb = DB::connection('Tenant')->getDatabaseName();
 
 		// Choose dashboard component based on tenant user role
 		$component = match ($user->role) {
-			'hr_manager'         => 'Tenant/HrDashboard',
 			'finance_manager'    => 'Tenant/FinanceDashboard',
 			'department_manager' => 'Tenant/DepartmentManagerDashboard',
 			'employee'           => 'Tenant/EmployeeDashboard',
@@ -63,6 +74,42 @@ Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 			'tenant_db'  => $tenantDb,
 		]);
 	})->name('tenant.dashboard');
+
+	Route::middleware([EnsureHrManager::class])->prefix('tenant/hr')->name('tenant.hr.')->group(function () {
+		Route::get('/', [TenantHrController::class, 'dashboard'])->name('dashboard');
+		Route::post('/employees', [TenantHrController::class, 'storeEmployee'])->name('employees.store');
+		Route::post('/employees/{id}/offboard', [TenantHrController::class, 'offboardEmployee'])->name('employees.offboard');
+		Route::post('/leave-requests/{id}/approve', [TenantHrController::class, 'approveLeaveRequest'])->name('leave.approve');
+		Route::post('/leave-requests/{id}/reject', [TenantHrController::class, 'rejectLeaveRequest'])->name('leave.reject');
+	});
+
+	Route::prefix('tenant/employee')->name('tenant.employee.')->group(function () {
+		Route::get('/leave-requests', [TenantEmployeeController::class, 'listLeaveRequests'])->name('leave.index');
+		Route::post('/leave-requests', [TenantEmployeeController::class, 'storeLeaveRequest'])->name('leave.store');
+		Route::post('/attendance/check-in', [TenantEmployeeController::class, 'checkIn'])->name('attendance.check_in');
+		Route::post('/attendance/check-out', [TenantEmployeeController::class, 'checkOut'])->name('attendance.check_out');
+	});
+
+	Route::middleware([EnsureFinanceManager::class])->prefix('tenant/finance')->name('tenant.finance.')->group(function () {
+		Route::get('/employees', [TenantFinanceController::class, 'listEmployees'])->name('employees.index');
+		Route::get('/payroll/runs', [TenantFinanceController::class, 'listPayrollRuns'])->name('payroll.runs.index');
+		Route::post('/payroll/run', [TenantFinanceController::class, 'runMonthlyPayroll'])->name('payroll.run');
+		Route::get('/payroll/runs/{id}/export', [TenantFinanceController::class, 'exportPayrollRunCsv'])->name('payroll.runs.export');
+		Route::get('/adjustments', [TenantFinanceController::class, 'listAdjustments'])->name('adjustments.index');
+		Route::post('/adjustments', [TenantFinanceController::class, 'storeAdjustment'])->name('adjustments.store');
+		Route::get('/audit/report', [TenantFinanceController::class, 'auditReport'])->name('audit.report');
+		Route::get('/audit/export', [TenantFinanceController::class, 'exportAuditCsv'])->name('audit.export');
+	});
+
+	Route::middleware([EnsureDepartmentManager::class])->prefix('tenant/manager')->name('tenant.manager.')->group(function () {
+		Route::get('/team', [TenantDepartmentManagerController::class, 'teamOverview'])->name('team.overview');
+		Route::get('/leave-requests', [TenantDepartmentManagerController::class, 'listTeamLeaveRequests'])->name('leave.index');
+		Route::post('/leave-requests/{id}/approve', [TenantDepartmentManagerController::class, 'approveLeaveRequest'])->name('leave.approve');
+		Route::post('/leave-requests/{id}/reject', [TenantDepartmentManagerController::class, 'rejectLeaveRequest'])->name('leave.reject');
+		Route::get('/attendance/summary', [TenantDepartmentManagerController::class, 'attendanceSummary'])->name('attendance.summary');
+		Route::get('/reviews', [TenantDepartmentManagerController::class, 'listReviews'])->name('reviews.index');
+		Route::post('/reviews', [TenantDepartmentManagerController::class, 'storeReview'])->name('reviews.store');
+	});
 
 	Route::get('/tenant/wifi-check', function (Request $request) {
 		$policy = AttendancePolicy::where('is_active', true)->orderByDesc('id')->first();
