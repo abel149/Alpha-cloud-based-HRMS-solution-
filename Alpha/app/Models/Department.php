@@ -23,7 +23,7 @@ class Department extends Model
 
     public function manager(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'manager_id');
+        return $this->belongsTo(TenantUser::class, 'manager_id');
     }
 
     public function employees(): HasMany
