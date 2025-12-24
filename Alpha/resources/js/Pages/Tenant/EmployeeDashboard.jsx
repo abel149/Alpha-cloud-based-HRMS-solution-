@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react';
 import React, { useEffect, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
-import { FiChevronDown, FiLogOut, FiUser, FiClock, FiCalendar, FiFileText } from 'react-icons/fi';
+import { FiHome, FiChevronDown, FiLogOut, FiUser, FiClock, FiCalendar, FiFileText, FiCheck } from 'react-icons/fi';
 
 export default function EmployeeDashboard({ user }) {
     const [activeTab, setActiveTab] = useState('overview');
@@ -14,6 +14,7 @@ export default function EmployeeDashboard({ user }) {
     const [lastCheckIn, setLastCheckIn] = useState(null);
     const [lastCheckOut, setLastCheckOut] = useState(null);
     const [attendanceHistory, setAttendanceHistory] = useState([]);
+    const [attendanceSubmitLoading, setAttendanceSubmitLoading] = useState(false);
 
     const [attendancePolicy, setAttendancePolicy] = useState({
         requires_company_wifi: false,
@@ -38,6 +39,13 @@ export default function EmployeeDashboard({ user }) {
         { id: 3, month: '2025-09', amount: '—', status: 'Processing' },
     ]);
 
+    const tabs = [
+        { key: 'overview', label: 'Overview', icon: <FiHome className="mr-2" /> },
+        { key: 'attendance', label: 'Attendance', icon: <FiClock className="mr-2" /> },
+        { key: 'leave', label: 'Leave', icon: <FiCalendar className="mr-2" /> },
+        { key: 'payslips', label: 'Pay Slips', icon: <FiFileText className="mr-2" /> },
+    ];
+
     const getInitials = (name) => {
         return name?.split(' ').map(part => part[0]).join('').toUpperCase().substring(0, 2) || 'U';
     };
@@ -51,6 +59,27 @@ export default function EmployeeDashboard({ user }) {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
+    }, []);
+
+    useEffect(() => {
+        const fetchLeaveRequests = async () => {
+            try {
+                const res = await fetch(route('tenant.employee.leave.index'), {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data?.ok) {
+                    setLeaveRequests(Array.isArray(data.requests) ? data.requests : []);
+                }
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        fetchLeaveRequests();
     }, []);
 
     useEffect(() => {
@@ -122,37 +151,64 @@ export default function EmployeeDashboard({ user }) {
     const canMarkAttendance = (!attendancePolicy.requires_fingerprint || fingerVerified)
         && (!attendancePolicy.requires_company_wifi || companyWifiVerified);
 
-    const handleCheckIn = () => {
-        if (!canMarkAttendance) return;
-        if (attendanceStatus === 'Checked in') return;
-        const now = new Date();
-        setAttendanceStatus('Checked in');
-        setLastCheckIn(now.toLocaleTimeString());
-        setAttendanceHistory((prev) => [
-            {
-                id: `${now.getTime()}-in`,
-                type: 'Check In',
-                time: now.toLocaleString(),
-            },
-            ...prev,
-        ]);
+    const getCsrfToken = () => {
+        const el = document.querySelector('meta[name="csrf-token"]');
+        return el ? el.getAttribute('content') : '';
     };
 
-    const handleCheckOut = () => {
+    const submitAttendance = async (type) => {
         if (!canMarkAttendance) return;
-        if (attendanceStatus !== 'Checked in') return;
-        const now = new Date();
-        setAttendanceStatus('Checked out');
-        setLastCheckOut(now.toLocaleTimeString());
-        setAttendanceHistory((prev) => [
-            {
-                id: `${now.getTime()}-out`,
-                type: 'Check Out',
-                time: now.toLocaleString(),
-            },
-            ...prev,
-        ]);
+
+        if (type === 'check_in' && attendanceStatus === 'Checked in') return;
+        if (type === 'check_out' && attendanceStatus !== 'Checked in') return;
+
+        setAttendanceSubmitLoading(true);
+        try {
+            const res = await fetch(
+                type === 'check_in' ? route('tenant.employee.attendance.check_in') : route('tenant.employee.attendance.check_out'),
+                {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ fingerprint_verified: fingerVerified }),
+                }
+            );
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok) {
+                return;
+            }
+
+            const now = new Date();
+            if (type === 'check_in') {
+                setAttendanceStatus('Checked in');
+                setLastCheckIn(now.toLocaleTimeString());
+            } else {
+                setAttendanceStatus('Checked out');
+                setLastCheckOut(now.toLocaleTimeString());
+            }
+
+            setAttendanceHistory((prev) => [
+                {
+                    id: data?.log?.id || `${now.getTime()}-${type}`,
+                    type: type === 'check_in' ? 'Check In' : 'Check Out',
+                    time: now.toLocaleString(),
+                },
+                ...prev,
+            ]);
+        } catch (e) {
+            // ignore
+        } finally {
+            setAttendanceSubmitLoading(false);
+        }
     };
+
+    const handleCheckIn = () => submitAttendance('check_in');
+    const handleCheckOut = () => submitAttendance('check_out');
 
     const handleLeaveChange = (e) => {
         setLeaveForm({ ...leaveForm, [e.target.name]: e.target.value });
@@ -175,27 +231,40 @@ export default function EmployeeDashboard({ user }) {
             return;
         }
 
-        const id = `${Date.now()}-leave`;
-        setLeaveRequests((prev) => [
-            {
-                id,
+        fetch(route('tenant.employee.leave.store'), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
                 leave_type: leaveForm.leave_type,
                 start_date: leaveForm.start_date,
                 end_date: leaveForm.end_date,
                 reason: leaveForm.reason,
-                status: 'Pending',
-                submitted_at: new Date().toLocaleString(),
-            },
-            ...prev,
-        ]);
+            }),
+        })
+            .then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.ok) {
+                    setLeaveError(data?.message || 'Failed to submit leave request.');
+                    return;
+                }
 
-        setLeaveForm({
-            leave_type: 'annual',
-            start_date: '',
-            end_date: '',
-            reason: '',
-        });
-        setLeaveSuccess('Leave request submitted (demo).');
+                setLeaveRequests((prev) => [data.leave, ...prev]);
+                setLeaveForm({
+                    leave_type: 'annual',
+                    start_date: '',
+                    end_date: '',
+                    reason: '',
+                });
+                setLeaveSuccess('Leave request submitted.');
+            })
+            .catch(() => {
+                setLeaveError('Failed to submit leave request.');
+            });
     };
 
     const viewLeaveRequest = (req) => {
@@ -203,9 +272,7 @@ export default function EmployeeDashboard({ user }) {
     };
 
     const cancelLeaveRequest = (id) => {
-        setLeaveRequests((prev) => prev.filter((r) => r.id !== id));
-        setLeaveSuccess('Leave request cancelled (demo).');
-        setLeaveError('');
+        setLeaveError('Cancel is not available yet.');
     };
 
     const viewPayslip = (p) => {
@@ -249,181 +316,136 @@ export default function EmployeeDashboard({ user }) {
                             </button>
 
                             {showProfileDropdown && (
-                                <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">{user?.name}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</div>
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowProfileDropdown(false)} />
+                                    <div className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
+                                        <div className="py-1">
+                                            <a
+                                                href={route('profile.edit')}
+                                                className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <FiUser className="mr-3 h-5 w-5 text-gray-400" /> Your Profile
+                                            </a>
+                                            <button
+                                                type="button"
+                                                onClick={() => Inertia.post(route('logout'))}
+                                                className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <FiLogOut className="mr-3 h-5 w-5" /> Sign out
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowProfileDropdown(false);
-                                            Inertia.get(route('profile.edit'));
-                                        }}
-                                        className="w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    >
-                                        <FiUser className="mr-3 h-5 w-5 text-gray-400" />
-                                        Profile Settings
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowProfileDropdown(false);
-                                            setActiveTab('attendance');
-                                        }}
-                                        className="w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    >
-                                        <FiClock className="mr-3 h-5 w-5 text-gray-400" />
-                                        Attendance
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowProfileDropdown(false);
-                                            setActiveTab('leave');
-                                        }}
-                                        className="w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    >
-                                        <FiCalendar className="mr-3 h-5 w-5 text-gray-400" />
-                                        Leave Requests
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowProfileDropdown(false);
-                                            setActiveTab('payslips');
-                                        }}
-                                        className="w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    >
-                                        <FiFileText className="mr-3 h-5 w-5 text-gray-400" />
-                                        Pay Slips
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowProfileDropdown(false);
-                                            Inertia.post(route('logout'));
-                                        }}
-                                        className="w-full flex items-center px-4 py-3 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    >
-                                        <FiLogOut className="mr-3 h-5 w-5" />
-                                        Sign out
-                                    </button>
-                                </div>
+                                </>
                             )}
                         </div>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-                    {/* Stats row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-4 text-white flex items-center justify-between">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-xs text-white/80 mb-1">Today</p>
-                                <p className="text-2xl font-bold">{attendanceStatus === 'Checked in' ? 'On duty' : 'Off duty'}</p>
+                                <p className="text-white/80 text-sm mb-1">Today</p>
+                                <p className="text-3xl font-bold">{attendanceStatus === 'Checked in' ? 'On duty' : 'Off duty'}</p>
                             </div>
                             <div className="text-xs text-white/80 text-right">
                                 {lastCheckIn && <p>In: {lastCheckIn}</p>}
                                 {lastCheckOut && <p>Out: {lastCheckOut}</p>}
                             </div>
                         </div>
-                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-4 text-white flex items-center justify-between">
+                    </div>
+
+                    <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-xs text-white/80 mb-1">Attendance</p>
-                                <p className="text-2xl font-bold">Check In/Out</p>
+                                <p className="text-white/80 text-sm mb-1">Attendance</p>
+                                <p className="text-3xl font-bold">Check In/Out</p>
                             </div>
-                            <FiClock className="w-7 h-7 text-white/90" />
-                        </div>
-                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-4 text-white flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-white/80 mb-1">Leave</p>
-                                <p className="text-2xl font-bold">Requests</p>
-                            </div>
-                            <FiCalendar className="w-7 h-7 text-white/90" />
+                            <FiClock className="h-10 w-10 text-white/80" />
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        <div className="px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('overview')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'overview'
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                        }`}
-                                >
-                                    Overview
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('attendance')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'attendance'
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                        }`}
-                                >
-                                    Attendance
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('leave')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'leave'
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                        }`}
-                                >
-                                    Leave
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('payslips')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'payslips'
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                        }`}
-                                >
-                                    Pay Slips
-                                </button>
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-white/80 text-sm mb-1">Leave</p>
+                                <p className="text-3xl font-bold">Requests</p>
                             </div>
-
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span
-                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                        wifiOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                    } dark:bg-opacity-20 dark:text-white`}
-                                >
-                                    <span className={`h-2 w-2 rounded-full mr-2 ${wifiOnline ? 'bg-green-500' : 'bg-red-500'}`} />
-                                    Internet
-                                </span>
-                                <span
-                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                        companyWifiVerified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                                    } dark:bg-opacity-20 dark:text-white`}
-                                >
-                                    <span className={`h-2 w-2 rounded-full mr-2 ${companyWifiVerified ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                    Company Wi‑Fi{attendancePolicy.requires_company_wifi ? '' : ' (Not required)'}
-                                </span>
-                                <span
-                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                        fingerVerified ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-700'
-                                    } dark:bg-opacity-20 dark:text-white`}
-                                >
-                                    <span className={`h-2 w-2 rounded-full mr-2 ${fingerVerified ? 'bg-indigo-500' : 'bg-gray-400'}`} />
-                                    Fingerprint{attendancePolicy.requires_fingerprint ? '' : ' (Not required)'}
-                                </span>
-                            </div>
+                            <FiCalendar className="h-10 w-10 text-white/80" />
                         </div>
                     </div>
 
-                    {/* Main grid */}
-                    {activeTab === 'overview' && (
-                        <div className="grid gap-6 lg:grid-cols-3">
-                            {/* Attendance card */}
-                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-white/80 text-sm mb-1">Security</p>
+                                <p className="text-3xl font-bold">{canMarkAttendance ? 'Ready' : 'Locked'}</p>
+                            </div>
+                            <FiCheck className="h-10 w-10 text-white/80" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6">
+                    <aside className="w-full md:w-64 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 h-fit">
+                        <nav className="space-y-1">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.key)}
+                                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+                                        activeTab === tab.key
+                                            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md transform scale-105'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                    }`}
+                                >
+                                    {tab.icon} {tab.label}
+                                </button>
+                            ))}
+                        </nav>
+                    </aside>
+
+                    <section className="flex-1 space-y-6">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {policyLoading ? 'Loading policy…' : (attendancePolicy.policy_name || 'Attendance Policy')}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                            wifiOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                        } dark:bg-opacity-20 dark:text-white`}
+                                    >
+                                        <span className={`h-2 w-2 rounded-full mr-2 ${wifiOnline ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                        Internet
+                                    </span>
+                                    <span
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                            companyWifiVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'
+                                        } dark:bg-opacity-20 dark:text-white`}
+                                    >
+                                        <span className={`h-2 w-2 rounded-full mr-2 ${companyWifiVerified ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                        Company Wi‑Fi{attendancePolicy.requires_company_wifi ? '' : ' (Not required)'}
+                                    </span>
+                                    <span
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                            fingerVerified ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-700'
+                                        } dark:bg-opacity-20 dark:text-white`}
+                                    >
+                                        <span className={`h-2 w-2 rounded-full mr-2 ${fingerVerified ? 'bg-indigo-500' : 'bg-gray-400'}`} />
+                                        Fingerprint{attendancePolicy.requires_fingerprint ? '' : ' (Not required)'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {activeTab === 'overview' && (
+                            <div className="grid gap-6 lg:grid-cols-3">
+                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <h3 className="text-lg font-bold mb-1">Quick Actions</h3>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Go straight to the actions you use most.</p>
 
@@ -460,7 +482,7 @@ export default function EmployeeDashboard({ user }) {
 
                             {/* Profile & leave/pay slips side column */}
                             <div className="space-y-6">
-                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                     <h3 className="text-lg font-bold mb-2">Pay Slips</h3>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">View your recent pay slips.</p>
                                     <div className="space-y-2">
@@ -485,9 +507,9 @@ export default function EmployeeDashboard({ user }) {
                         </div>
                     )}
 
-                    {activeTab === 'attendance' && (
+                        {activeTab === 'attendance' && (
                         <div className="grid gap-6 lg:grid-cols-3">
-                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <h3 className="text-lg font-bold mb-1">Attendance</h3>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                                     {policyLoading
@@ -575,7 +597,7 @@ export default function EmployeeDashboard({ user }) {
                                 </div>
                             </div>
 
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-lg font-bold">History</h3>
                                     <button
@@ -604,9 +626,9 @@ export default function EmployeeDashboard({ user }) {
                         </div>
                     )}
 
-                    {activeTab === 'leave' && (
+                        {activeTab === 'leave' && (
                         <div className="grid gap-6 lg:grid-cols-3">
-                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <h3 className="text-lg font-bold mb-1">Submit Leave Request</h3>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Submit a leave request to HR (demo UI).</p>
 
@@ -692,7 +714,7 @@ export default function EmployeeDashboard({ user }) {
                                 </form>
                             </div>
 
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <h3 className="text-lg font-bold mb-3">My Requests</h3>
                                 <div className="space-y-2">
                                     {leaveRequests.length === 0 ? (
@@ -739,8 +761,8 @@ export default function EmployeeDashboard({ user }) {
                         </div>
                     )}
 
-                    {activeTab === 'payslips' && (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {activeTab === 'payslips' && (
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                                 <div>
                                     <h3 className="text-lg font-bold">Pay Slips</h3>
@@ -799,7 +821,9 @@ export default function EmployeeDashboard({ user }) {
                                 </table>
                             </div>
                         </div>
-                    )}
+                        )}
+                    </section>
+                </div>
             </main>
         </div>
     );
