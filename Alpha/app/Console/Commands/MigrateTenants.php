@@ -66,6 +66,41 @@ class MigrateTenants extends Command
                         '--database' => 'Tenant',
                         '--force' => true,
                     ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_22_000006_expand_leave_requests_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_22_000007_expand_attendance_logs_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000008_expand_payrolls_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000009_create_payroll_items_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000010_create_payroll_adjustments_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000011_create_performance_reviews_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000012_ensure_finance_and_reviews_schema.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
                 } else {
                     Artisan::call('migrate', [
                         '--path' => 'database/migrations/tenant',
@@ -88,6 +123,41 @@ class MigrateTenants extends Command
                     ]);
                     Artisan::call('migrate', [
                         '--path' => 'database/migrations/tenant/2025_12_22_000003_add_wifi_and_fingerprint_to_attendance_policies_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_22_000006_expand_leave_requests_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_22_000007_expand_attendance_logs_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000008_expand_payrolls_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000009_create_payroll_items_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000010_create_payroll_adjustments_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000011_create_performance_reviews_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_24_000012_ensure_finance_and_reviews_schema.php',
                         '--database' => 'Tenant',
                         '--force' => true,
                     ]);
