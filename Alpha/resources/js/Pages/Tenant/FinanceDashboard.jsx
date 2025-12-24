@@ -1,63 +1,651 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Inertia } from '@inertiajs/inertia';
+import { FiChevronDown, FiDownload, FiFileText, FiLogOut, FiPlus, FiShield, FiUser, FiBriefcase } from 'react-icons/fi';
 
 export default function FinanceDashboard({ user, tenant_db }) {
-    return (
-        <AuthenticatedLayout
-            header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Finance Team Dashboard
-                </h2>
+    const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+    const [activeTab, setActiveTab] = useState('payroll');
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    const [employees, setEmployees] = useState([]);
+    const [payrollRuns, setPayrollRuns] = useState([]);
+    const [auditReport, setAuditReport] = useState(null);
+    const [adjustments, setAdjustments] = useState([]);
+    const [warning, setWarning] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const now = new Date();
+    const [payrollForm, setPayrollForm] = useState({
+        month: String(now.getMonth() + 1),
+        year: String(now.getFullYear()),
+    });
+
+    const [adjustmentForm, setAdjustmentForm] = useState({
+        employee_id: '',
+        month: String(now.getMonth() + 1),
+        year: String(now.getFullYear()),
+        type: 'deduction',
+        amount: '',
+        description: '',
+    });
+
+    const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    };
+
+    const xsrfTokenFromCookie = () => {
+        const raw = getCookie('XSRF-TOKEN');
+        if (!raw) return null;
+        try {
+            return decodeURIComponent(raw);
+        } catch {
+            return raw;
+        }
+    };
+
+    const normalizeSameOriginUrl = (url) => {
+        try {
+            const u = new URL(url, window.location.href);
+            if (u.origin !== window.location.origin) {
+                return `${u.pathname}${u.search}${u.hash}`;
             }
-        >
+            return `${u.pathname}${u.search}${u.hash}`;
+        } catch {
+            return url;
+        }
+    };
+
+    const fetchJson = async (url, options = {}) => {
+        const method = (options.method || 'GET').toUpperCase();
+        const isJsonBody = options.body && typeof options.body === 'string';
+
+        const res = await fetch(normalizeSameOriginUrl(url), {
+            ...options,
+            method,
+            credentials: 'include',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
+                ...(csrfToken() ? { 'X-CSRF-TOKEN': csrfToken() } : {}),
+                ...(xsrfTokenFromCookie() ? { 'X-XSRF-TOKEN': xsrfTokenFromCookie() } : {}),
+                ...(options.headers || {}),
+            },
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const message = res.status === 419
+                ? 'Session/CSRF expired. Refresh the page and try again.'
+                : (data?.message || `Request failed (${res.status})`);
+            throw new Error(message);
+        }
+        return data;
+    };
+
+    const getInitials = (name) => {
+        return name?.split(' ').map(part => part[0]).join('').toUpperCase().substring(0, 2) || 'U';
+    };
+
+    const tabs = [
+        { key: 'payroll', label: 'Payroll', icon: <FiBriefcase className="mr-2" /> },
+        { key: 'reports', label: 'Reports', icon: <FiFileText className="mr-2" /> },
+        { key: 'tax', label: 'Tax & Deductions', icon: <FiShield className="mr-2" /> },
+    ];
+
+    const selectedEmployee = useMemo(() => {
+        if (!adjustmentForm.employee_id) return null;
+        return (employees || []).find((e) => String(e.id) === String(adjustmentForm.employee_id)) || null;
+    }, [employees, adjustmentForm.employee_id]);
+
+    const filteredPayrollRuns = useMemo(() => {
+        const q = (searchTerm || '').toLowerCase();
+        if (!q) return payrollRuns || [];
+        return (payrollRuns || []).filter((r) => {
+            const period = `${r?.year ?? ''}-${r?.month ?? ''}`;
+            return `${period} ${r?.status ?? ''} ${r?.id ?? ''}`.toLowerCase().includes(q);
+        });
+    }, [payrollRuns, searchTerm]);
+
+    const filteredAdjustments = useMemo(() => {
+        const q = (searchTerm || '').toLowerCase();
+        if (!q) return adjustments || [];
+        return (adjustments || []).filter((a) => {
+            const emp = a?.employee?.user?.name || '';
+            const period = `${a?.year ?? ''}-${a?.month ?? ''}`;
+            return `${emp} ${period} ${a?.type ?? ''} ${a?.description ?? ''}`.toLowerCase().includes(q);
+        });
+    }, [adjustments, searchTerm]);
+
+    const loadEmployees = async () => {
+        const data = await fetchJson(route('tenant.finance.employees.index'));
+        setEmployees(Array.isArray(data?.employees) ? data.employees : []);
+        if (data?.warning) setWarning(String(data.warning));
+    };
+
+    const loadPayrollRuns = async () => {
+        const data = await fetchJson(route('tenant.finance.payroll.runs.index'));
+        setPayrollRuns(Array.isArray(data?.runs) ? data.runs : []);
+        if (data?.warning) setWarning(String(data.warning));
+    };
+
+    const loadAuditReport = async () => {
+        const data = await fetchJson(route('tenant.finance.audit.report'));
+        setAuditReport(data?.report || null);
+        if (data?.warning) setWarning(String(data.warning));
+    };
+
+    const loadAdjustments = async () => {
+        const data = await fetchJson(route('tenant.finance.adjustments.index'), {
+            method: 'GET',
+        });
+        setAdjustments(Array.isArray(data?.adjustments) ? data.adjustments : []);
+        if (data?.warning) setWarning(String(data.warning));
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const run = async () => {
+            setLoading(true);
+            setError('');
+            setWarning('');
+            try {
+                await loadEmployees();
+                await loadPayrollRuns();
+                await loadAuditReport();
+                await loadAdjustments();
+            } catch (e) {
+                if (!cancelled) setError(e?.message || 'Failed to load finance data');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+
+        run();
+        return () => { cancelled = true; };
+    }, []);
+
+    const runPayroll = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await fetchJson(route('tenant.finance.payroll.run'), {
+                method: 'POST',
+                body: JSON.stringify({
+                    month: Number(payrollForm.month),
+                    year: Number(payrollForm.year),
+                }),
+            });
+            setSuccess('Payroll generated successfully');
+            if (data?.payroll) {
+                setPayrollRuns((prev) => [data.payroll, ...(prev || [])]);
+            } else {
+                await loadPayrollRuns();
+            }
+            await loadAuditReport();
+        } catch (e2) {
+            setError(e2?.message || 'Failed to run payroll');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const submitAdjustment = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await fetchJson(route('tenant.finance.adjustments.store'), {
+                method: 'POST',
+                body: JSON.stringify({
+                    employee_id: Number(adjustmentForm.employee_id),
+                    month: Number(adjustmentForm.month),
+                    year: Number(adjustmentForm.year),
+                    type: adjustmentForm.type,
+                    amount: Number(adjustmentForm.amount),
+                    description: adjustmentForm.description || null,
+                }),
+            });
+            setSuccess('Adjustment saved');
+            if (data?.adjustment) {
+                setAdjustments((prev) => [data.adjustment, ...(prev || [])]);
+            } else {
+                await loadAdjustments();
+            }
+        } catch (e2) {
+            setError(e2?.message || 'Failed to save adjustment');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const downloadUrl = (url) => {
+        window.location.href = url;
+    };
+
+    const refreshAll = async () => {
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        setWarning('');
+        try {
+            await loadEmployees();
+            await loadPayrollRuns();
+            await loadAuditReport();
+            await loadAdjustments();
+            setSuccess('Refreshed');
+        } catch (e) {
+            setError(e?.message || 'Failed to refresh');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
             <Head title="Finance Dashboard" />
 
-            <div className="py-8">
-                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8 space-y-6">
-                    <div className="bg-white shadow-sm sm:rounded-lg p-6">
-                        <p className="text-sm text-gray-500 mb-2">Logged in as: {user?.name} ({user?.role})</p>
-                        <p className="text-sm text-gray-500">Tenant DB: {tenant_db}</p>
-                    </div>
-
-                    <div className="grid gap-6 md:grid-cols-3">
-                        <div className="bg-white shadow-sm sm:rounded-lg p-6">
-                            <h3 className="text-lg font-semibold mb-2">Run Monthly Payroll</h3>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Prepare and execute monthly payroll for employees.
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                <li>Review salary and allowance data</li>
-                                <li>Generate payroll runs</li>
-                                <li>Export bank/payment files</li>
-                            </ul>
+            <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-transparent">
+                                Finance Portal
+                            </h1>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Payroll, reports, and tax management</p>
                         </div>
 
-                        <div className="bg-white shadow-sm sm:rounded-lg p-6">
-                            <h3 className="text-lg font-semibold mb-2">Generate Audit Reports</h3>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Access financial reports for audits and reviews.
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                <li>Payroll history and summaries</li>
-                                <li>Tax and deduction reports</li>
-                                <li>Export data for auditors</li>
-                            </ul>
-                        </div>
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white font-medium shadow-lg">
+                                    {getInitials(user?.name || 'User')}
+                                </div>
+                                <div className="text-left hidden md:block">
+                                    <div className="font-medium">{user?.name}</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">{user?.role}</div>
+                                </div>
+                                <FiChevronDown className="h-4 w-4" />
+                            </button>
 
-                        <div className="bg-white shadow-sm sm:rounded-lg p-6">
-                            <h3 className="text-lg font-semibold mb-2">Tax & Deduction Adjustments</h3>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Manage tax rules and special deductions.
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                <li>Configure tax brackets</li>
-                                <li>Apply one-time adjustments</li>
-                                <li>Review compliance status</li>
-                            </ul>
+                            {showProfileDropdown && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowProfileDropdown(false)} />
+                                    <div className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
+                                        <div className="py-1">
+                                            <a
+                                                href={route('profile.edit')}
+                                                className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <FiUser className="mr-3 h-5 w-5 text-gray-400" /> Your Profile
+                                            </a>
+                                            <button
+                                                type="button"
+                                                onClick={() => Inertia.post(route('logout'))}
+                                                className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <FiLogOut className="mr-3 h-5 w-5" /> Sign out
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
-            </div>
-        </AuthenticatedLayout>
+            </header>
+
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-white/80 text-sm mb-1">Workspace</p>
+                                <p className="text-2xl font-bold">Finance</p>
+                            </div>
+                            <FiBriefcase className="h-10 w-10 text-white/80" />
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 lg:col-span-3">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Logged in as</p>
+                        <p className="text-lg font-semibold">{user?.name} <span className="text-sm text-gray-500 dark:text-gray-400">({user?.role})</span></p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Tenant DB: {tenant_db}</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+                    <div className="flex-1 min-w-[240px]">
+                        <input
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                            placeholder="Search payrolls, adjustments..."
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        disabled={loading}
+                        onClick={refreshAll}
+                        className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+                    >
+                        Refresh
+                    </button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6">
+                    <aside className="w-full md:w-64 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 h-fit">
+                        <nav className="space-y-1">
+                            {tabs.map((t) => (
+                                <button
+                                    key={t.key}
+                                    type="button"
+                                    onClick={() => setActiveTab(t.key)}
+                                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+                                        activeTab === t.key
+                                            ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md transform scale-105'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                    }`}
+                                >
+                                    {t.icon} {t.label}
+                                </button>
+                            ))}
+                        </nav>
+                    </aside>
+
+                    <section className="flex-1">
+                        {(warning || error || success) && (
+                            <div className="mb-6">
+                                {warning && (
+                                    <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">{warning}</div>
+                                )}
+                                {error && (
+                                    <div className={`${warning ? 'mt-3 ' : ''}p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm`}>{error}</div>
+                                )}
+                                {success && (
+                                    <div className="mt-3 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm">{success}</div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'payroll' && (
+                            <div className="space-y-6">
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                                        <div>
+                                            <h3 className="text-lg font-semibold">Run Monthly Payroll</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Generates payroll based on employee salary and saved adjustments for the selected month.</p>
+                                        </div>
+                                    </div>
+
+                                    <form onSubmit={runPayroll} className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Month</label>
+                                            <input
+                                                value={payrollForm.month}
+                                                onChange={(e) => setPayrollForm((p) => ({ ...p, month: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="1"
+                                                max="12"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Year</label>
+                                            <input
+                                                value={payrollForm.year}
+                                                onChange={(e) => setPayrollForm((p) => ({ ...p, year: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="2000"
+                                                max="2100"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="md:col-span-3">
+                                            <button
+                                                disabled={loading}
+                                                className="w-full md:w-auto inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg shadow-sm hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60"
+                                            >
+                                                <FiPlus className="mr-2" /> {loading ? 'Working...' : 'Generate Payroll'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                                        <h3 className="text-lg font-semibold">Payroll Runs</h3>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Latest runs (up to 24)</p>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full">
+                                            <thead className="bg-gray-50 dark:bg-gray-900/50">
+                                                <tr>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Period</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Employees</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Gross</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Net</th>
+                                                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Export</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                {filteredPayrollRuns.map((r) => (
+                                                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                                        <td className="px-6 py-4 text-sm font-medium">{String(r.year).padStart(4, '0')}-{String(r.month).padStart(2, '0')}</td>
+                                                        <td className="px-6 py-4 text-sm">{r.employees_count}</td>
+                                                        <td className="px-6 py-4 text-sm">{r.total_gross}</td>
+                                                        <td className="px-6 py-4 text-sm">{r.total_net}</td>
+                                                        <td className="px-6 py-4 text-sm text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => downloadUrl(route('tenant.finance.payroll.runs.export', r.id))}
+                                                                className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                            >
+                                                                <FiDownload className="mr-2" /> CSV
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {filteredPayrollRuns.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No payroll runs yet.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'reports' && (
+                            <div className="space-y-6">
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <div className="flex items-center justify-between flex-wrap gap-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold">Audit Report</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Quick summary for compliance and audits.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => downloadUrl(route('tenant.finance.audit.export'))}
+                                            className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-sm hover:from-emerald-700 hover:to-emerald-600"
+                                        >
+                                            <FiDownload className="mr-2" /> Export CSV
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">Active employees</div>
+                                            <div className="text-2xl font-bold mt-1">{auditReport?.employees_active ?? '-'}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">Payroll runs</div>
+                                            <div className="text-2xl font-bold mt-1">{auditReport?.payroll_runs ?? '-'}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">Adjustments</div>
+                                            <div className="text-2xl font-bold mt-1">{auditReport?.adjustments ?? '-'}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">Last payroll</div>
+                                            <div className="text-2xl font-bold mt-1">{auditReport?.last_payroll ? `${String(auditReport.last_payroll.year).padStart(4, '0')}-${String(auditReport.last_payroll.month).padStart(2, '0')}` : '-'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'tax' && (
+                            <div className="space-y-6">
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-semibold">Tax & Deduction Adjustments</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Add one-time deductions, taxes, or bonuses for a specific month.</p>
+
+                                    <form onSubmit={submitAdjustment} className="mt-5 grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium mb-1">Employee</label>
+                                            <select
+                                                value={adjustmentForm.employee_id}
+                                                onChange={(e) => setAdjustmentForm((p) => ({ ...p, employee_id: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                required
+                                            >
+                                                <option value="">Select employee...</option>
+                                                {(employees || []).map((e) => (
+                                                    <option key={e.id} value={e.id}>{e?.user?.name} ({e?.employee_code || `#${e.id}`})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Month</label>
+                                            <input
+                                                value={adjustmentForm.month}
+                                                onChange={(e) => setAdjustmentForm((p) => ({ ...p, month: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="1"
+                                                max="12"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Year</label>
+                                            <input
+                                                value={adjustmentForm.year}
+                                                onChange={(e) => setAdjustmentForm((p) => ({ ...p, year: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="2000"
+                                                max="2100"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Type</label>
+                                            <select
+                                                value={adjustmentForm.type}
+                                                onChange={(e) => setAdjustmentForm((p) => ({ ...p, type: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                required
+                                            >
+                                                <option value="deduction">Deduction</option>
+                                                <option value="tax">Tax</option>
+                                                <option value="bonus">Bonus</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Amount</label>
+                                            <input
+                                                value={adjustmentForm.amount}
+                                                onChange={(e) => setAdjustmentForm((p) => ({ ...p, amount: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="md:col-span-6">
+                                            <label className="block text-sm font-medium mb-1">Description (optional)</label>
+                                            <input
+                                                value={adjustmentForm.description}
+                                                onChange={(e) => setAdjustmentForm((p) => ({ ...p, description: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                placeholder={selectedEmployee ? `Adjustment for ${selectedEmployee?.user?.name}` : 'Reason / note'}
+                                            />
+                                        </div>
+
+                                        <div className="md:col-span-6">
+                                            <button
+                                                disabled={loading}
+                                                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg shadow-sm hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60"
+                                            >
+                                                <FiPlus className="mr-2" /> {loading ? 'Saving...' : 'Save Adjustment'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                                        <h3 className="text-lg font-semibold">Recent Adjustments</h3>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Latest 200 entries</p>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full">
+                                            <thead className="bg-gray-50 dark:bg-gray-900/50">
+                                                <tr>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Employee</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Period</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Amount</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Description</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                {filteredAdjustments.map((a) => (
+                                                    <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                                        <td className="px-6 py-4 text-sm font-medium">{a?.employee?.user?.name || `Employee #${a.employee_id}`}</td>
+                                                        <td className="px-6 py-4 text-sm">{String(a.year).padStart(4, '0')}-{String(a.month).padStart(2, '0')}</td>
+                                                        <td className="px-6 py-4 text-sm">{a.type}</td>
+                                                        <td className="px-6 py-4 text-sm">{a.amount}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{a.description || '-'}</td>
+                                                    </tr>
+                                                ))}
+                                                {filteredAdjustments.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No adjustments yet.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                </div>
+            </main>
+        </div>
     );
 }
