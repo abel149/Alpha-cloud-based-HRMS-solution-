@@ -261,7 +261,7 @@ Route::middleware(['auth'])->prefix('superadmin')->name('subscription-plans.')->
 });
 //subscription
 Route::post('/subscription-plans', [TenantController::class, 'storeSubscriptionPlan'])
-    ->name('subscription-plans.store')
+    ->name('subscription-plans.direct.store')
     ->middleware(['auth']); // only accessible to logged-in Super Admin
 //create user 
 Route::post('/users', [TenantController::class, 'storeuser'])
