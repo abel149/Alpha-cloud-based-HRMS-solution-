@@ -1,4 +1,4 @@
-import { Head, useForm, Link } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/inertia-react';
 import { FiMail, FiArrowLeft, FiSend } from 'react-icons/fi';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';

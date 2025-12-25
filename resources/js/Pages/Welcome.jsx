@@ -1,4 +1,4 @@
-import { Head, Link, useForm, router as Inertia } from '@inertiajs/react';
+import { Head, Link, useForm, router as Inertia } from '@inertiajs/inertia-react';
 import { FiArrowRight, FiCheckCircle, FiMenu, FiX, FiMoon, FiSun, FiLock, FiMail, FiUser, FiEye, FiEyeOff, FiLogIn, FiBriefcase } from 'react-icons/fi';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';

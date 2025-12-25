@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
-import { usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/inertia-react';
 import { FiUsers, FiBriefcase, FiCalendar, FiClock, FiShield, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX, FiCheck, FiSearch, FiEdit, FiTrash2, FiMoreVertical } from 'react-icons/fi';
 
 export default function CompanyAdminDashboard({ employees = [], departments = [], leavePolicies = [], attendancePolicies = [], roles = [], permissions = [], stats }) {

@@ -1,4 +1,4 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/inertia-react';
 import React, { useMemo, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { FiChevronDown, FiLogOut, FiUser, FiUsers, FiHome } from 'react-icons/fi';

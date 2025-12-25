@@ -1,5 +1,5 @@
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/inertia-react';
 
 export default function GuestLayout({ children }) {
     return (

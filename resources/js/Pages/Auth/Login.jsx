@@ -4,7 +4,7 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/inertia-react';
 import { FiLogIn, FiUser, FiLock, FiBriefcase, FiChevronDown, FiArrowLeft } from 'react-icons/fi';
 
 export default function Login({ status, canResetPassword }) {
