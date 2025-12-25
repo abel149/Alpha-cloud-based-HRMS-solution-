@@ -1,5 +1,5 @@
 import ProfileLayout from '@/Layouts/ProfileLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/inertia-react';
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
