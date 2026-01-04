@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\FinanceSetting;
 use App\Models\Payroll;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollItem;
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Schema;
 
 class TenantFinanceController extends Controller
 {
+    private function tenantHasFinanceSettingsSchema(): bool
+    {
+        return Schema::connection('Tenant')->hasTable('finance_settings');
+    }
+
     private function tenantHasPayrollSchema(): bool
     {
         return Schema::connection('Tenant')->hasTable('payrolls')
@@ -28,6 +34,71 @@ class TenantFinanceController extends Controller
     private function tenantHasAdjustmentsSchema(): bool
     {
         return Schema::connection('Tenant')->hasTable('payroll_adjustments');
+    }
+
+    public function getFinanceSettings()
+    {
+        if (!$this->tenantHasFinanceSettingsSchema()) {
+            return response()->json([
+                'ok' => true,
+                'settings' => [
+                    'tax_rate_percent' => 0,
+                    'deduction_rate_percent' => 0,
+                ],
+                'warning' => 'Tenant finance settings schema not migrated yet.',
+            ]);
+        }
+
+        $settings = FinanceSetting::orderByDesc('id')->first();
+
+        return response()->json([
+            'ok' => true,
+            'settings' => [
+                'tax_rate_percent' => (float) ($settings?->tax_rate_percent ?? 0),
+                'deduction_rate_percent' => (float) ($settings?->deduction_rate_percent ?? 0),
+            ],
+        ]);
+    }
+
+    public function updateFinanceSettings(Request $request)
+    {
+        if (!$this->tenantHasFinanceSettingsSchema()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tenant database is not migrated for finance settings yet. Run php artisan migrate:tenants.',
+            ], 409);
+        }
+
+        $request->validate([
+            'tax_rate_percent' => 'required|numeric|min:0|max:100',
+            'deduction_rate_percent' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $tenantUser = TenantUser::where('email', auth()->user()->email)->first();
+        $existing = FinanceSetting::orderByDesc('id')->first();
+
+        if ($existing) {
+            $existing->tax_rate_percent = (float) $request->tax_rate_percent;
+            $existing->deduction_rate_percent = (float) $request->deduction_rate_percent;
+            $existing->updated_by = $tenantUser?->id;
+            $existing->save();
+            $settings = $existing;
+        } else {
+            $settings = FinanceSetting::create([
+                'tax_rate_percent' => (float) $request->tax_rate_percent,
+                'deduction_rate_percent' => (float) $request->deduction_rate_percent,
+                'created_by' => $tenantUser?->id,
+                'updated_by' => $tenantUser?->id,
+            ]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'settings' => [
+                'tax_rate_percent' => (float) $settings->tax_rate_percent,
+                'deduction_rate_percent' => (float) $settings->deduction_rate_percent,
+            ],
+        ]);
     }
 
     public function listEmployees()
@@ -60,12 +131,35 @@ class TenantFinanceController extends Controller
         return response()->json(['ok' => true, 'runs' => $runs]);
     }
 
-    public function runMonthlyPayroll(Request $request)
+    public function showPayrollRun($id)
     {
-        if (!$this->tenantHasPayrollSchema() || !$this->tenantHasPayrollItemsSchema() || !$this->tenantHasAdjustmentsSchema()) {
+        if (!$this->tenantHasPayrollSchema() || !$this->tenantHasPayrollItemsSchema()) {
             return response()->json([
                 'ok' => false,
                 'message' => 'Tenant database is not migrated for payroll yet. Run php artisan migrate:tenants.',
+            ], 409);
+        }
+
+        $run = Payroll::with(['generator'])->findOrFail((int) $id);
+
+        $items = PayrollItem::with(['employee.user'])
+            ->where('payroll_id', $run->id)
+            ->orderBy('employee_id')
+            ->get();
+
+        return response()->json([
+            'ok' => true,
+            'run' => $run,
+            'items' => $items,
+        ]);
+    }
+
+    public function runMonthlyPayroll(Request $request)
+    {
+        if (!$this->tenantHasPayrollSchema() || !$this->tenantHasPayrollItemsSchema() || !$this->tenantHasAdjustmentsSchema() || !$this->tenantHasFinanceSettingsSchema()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tenant database is not migrated for payroll/finance yet. Run php artisan migrate:tenants.',
             ], 409);
         }
 
@@ -86,6 +180,29 @@ class TenantFinanceController extends Controller
 
         $employees = Employee::with(['user'])->where('status', 'active')->get();
 
+        $missingSalary = $employees->filter(function ($e) {
+            $salary = (float) ($e->salary ?? 0);
+            return $salary <= 0;
+        })->values();
+
+        if ($missingSalary->count() > 0) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Payroll cannot be processed because some active employees have missing/zero salary (gross). Please set their salary first.',
+                'employees' => $missingSalary->map(function ($e) {
+                    return [
+                        'id' => $e->id,
+                        'name' => optional($e->user)->name,
+                        'email' => optional($e->user)->email,
+                    ];
+                })->values(),
+            ], 422);
+        }
+
+        $settings = FinanceSetting::orderByDesc('id')->first();
+        $taxRate = (float) ($settings?->tax_rate_percent ?? 0);
+        $deductionRate = (float) ($settings?->deduction_rate_percent ?? 0);
+
         $employeeIds = $employees->pluck('id')->values();
         $adjustments = PayrollAdjustment::whereIn('employee_id', $employeeIds)
             ->where('month', $month)
@@ -93,7 +210,7 @@ class TenantFinanceController extends Controller
             ->get()
             ->groupBy('employee_id');
 
-        $payroll = DB::connection('Tenant')->transaction(function () use ($employees, $adjustments, $month, $year, $tenantUser) {
+        $payroll = DB::connection('Tenant')->transaction(function () use ($employees, $adjustments, $month, $year, $tenantUser, $taxRate, $deductionRate) {
             $run = Payroll::create([
                 'month' => $month,
                 'year' => $year,
@@ -101,12 +218,18 @@ class TenantFinanceController extends Controller
                 'generated_by' => $tenantUser?->id,
                 'generated_at' => now(),
                 'total_gross' => 0,
+                'total_bonus' => 0,
+                'total_deductions' => 0,
+                'total_tax' => 0,
                 'total_adjustments' => 0,
                 'total_net' => 0,
                 'employees_count' => $employees->count(),
             ]);
 
             $totalGross = 0;
+            $totalBonus = 0;
+            $totalDeductions = 0;
+            $totalTax = 0;
             $totalAdj = 0;
             $totalNet = 0;
 
@@ -114,14 +237,17 @@ class TenantFinanceController extends Controller
                 $gross = (float) ($emp->salary ?? 0);
 
                 $empAdjustments = $adjustments->get($emp->id, collect());
-                $adjustmentTotal = (float) $empAdjustments->sum(function ($a) {
-                    $amount = (float) $a->amount;
-                    $type = (string) $a->type;
-                    if (in_array($type, ['bonus'], true)) {
-                        return $amount;
-                    }
-                    return -1 * $amount;
-                });
+                $bonusAdj = (float) $empAdjustments->where('type', 'bonus')->sum('amount');
+                $deductionAdj = (float) $empAdjustments->where('type', 'deduction')->sum('amount');
+                $taxAdj = (float) $empAdjustments->where('type', 'tax')->sum('amount');
+
+                $companyDeduction = $gross * ($deductionRate / 100.0);
+                $companyTax = $gross * ($taxRate / 100.0);
+
+                $deductionTotal = $companyDeduction + $deductionAdj;
+                $taxTotal = $companyTax + $taxAdj;
+
+                $adjustmentTotal = $bonusAdj - $deductionTotal - $taxTotal;
 
                 $net = $gross + $adjustmentTotal;
 
@@ -129,16 +255,25 @@ class TenantFinanceController extends Controller
                     'payroll_id' => $run->id,
                     'employee_id' => $emp->id,
                     'gross' => $gross,
+                    'bonus_total' => $bonusAdj,
+                    'deduction_total' => $deductionTotal,
+                    'tax_total' => $taxTotal,
                     'adjustments_total' => $adjustmentTotal,
                     'net' => $net,
                 ]);
 
                 $totalGross += $gross;
+                $totalBonus += $bonusAdj;
+                $totalDeductions += $deductionTotal;
+                $totalTax += $taxTotal;
                 $totalAdj += $adjustmentTotal;
                 $totalNet += $net;
             }
 
             $run->total_gross = $totalGross;
+            $run->total_bonus = $totalBonus;
+            $run->total_deductions = $totalDeductions;
+            $run->total_tax = $totalTax;
             $run->total_adjustments = $totalAdj;
             $run->total_net = $totalNet;
             $run->save();
@@ -168,7 +303,7 @@ class TenantFinanceController extends Controller
 
             fputcsv($out, ['Payroll Period', sprintf('%04d-%02d', (int) $payroll->year, (int) $payroll->month)]);
             fputcsv($out, []);
-            fputcsv($out, ['Employee ID', 'Employee Name', 'Employee Email', 'Gross', 'Adjustments', 'Net']);
+            fputcsv($out, ['Employee ID', 'Employee Name', 'Employee Email', 'Gross', 'Bonus', 'Deductions', 'Tax', 'Adjustments', 'Net']);
 
             foreach ($items as $item) {
                 fputcsv($out, [
@@ -176,6 +311,9 @@ class TenantFinanceController extends Controller
                     optional(optional($item->employee)->user)->name,
                     optional(optional($item->employee)->user)->email,
                     (string) $item->gross,
+                    (string) ($item->bonus_total ?? 0),
+                    (string) ($item->deduction_total ?? 0),
+                    (string) ($item->tax_total ?? 0),
                     (string) $item->adjustments_total,
                     (string) $item->net,
                 ]);
@@ -258,6 +396,8 @@ class TenantFinanceController extends Controller
         $adjustmentsCount = $this->tenantHasAdjustmentsSchema() ? PayrollAdjustment::count() : 0;
         $employeesCount = Employee::where('status', 'active')->count();
 
+        $settings = $this->tenantHasFinanceSettingsSchema() ? FinanceSetting::orderByDesc('id')->first() : null;
+
         return response()->json([
             'ok' => true,
             'report' => [
@@ -265,6 +405,8 @@ class TenantFinanceController extends Controller
                 'payroll_runs' => $runsCount,
                 'last_payroll' => $lastRun,
                 'adjustments' => $adjustmentsCount,
+                'tax_rate_percent' => (float) ($settings?->tax_rate_percent ?? 0),
+                'deduction_rate_percent' => (float) ($settings?->deduction_rate_percent ?? 0),
             ],
         ]);
     }
@@ -280,7 +422,7 @@ class TenantFinanceController extends Controller
         return response()->streamDownload(function () use ($runs) {
             $out = fopen('php://output', 'w');
 
-            fputcsv($out, ['Payroll ID', 'Period', 'Status', 'Employees', 'Total Gross', 'Total Adjustments', 'Total Net', 'Generated At']);
+            fputcsv($out, ['Payroll ID', 'Period', 'Status', 'Employees', 'Total Gross', 'Total Bonus', 'Total Deductions', 'Total Tax', 'Total Adjustments', 'Total Net', 'Generated At']);
 
             foreach ($runs as $run) {
                 fputcsv($out, [
@@ -289,6 +431,9 @@ class TenantFinanceController extends Controller
                     $run->status,
                     (string) $run->employees_count,
                     (string) $run->total_gross,
+                    (string) ($run->total_bonus ?? 0),
+                    (string) ($run->total_deductions ?? 0),
+                    (string) ($run->total_tax ?? 0),
                     (string) $run->total_adjustments,
                     (string) $run->total_net,
                     optional($run->generated_at)->toDateTimeString(),
