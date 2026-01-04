@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/inertia-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
-import { FiChevronDown, FiDownload, FiFileText, FiLogOut, FiPlus, FiShield, FiUser, FiBriefcase } from 'react-icons/fi';
+import { FiChevronDown, FiDownload, FiFileText, FiLogOut, FiPlus, FiShield, FiUser, FiBriefcase, FiX } from 'react-icons/fi';
 
 export default function FinanceDashboard({ user, tenant_db }) {
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -15,6 +15,11 @@ export default function FinanceDashboard({ user, tenant_db }) {
     const [payrollRuns, setPayrollRuns] = useState([]);
     const [auditReport, setAuditReport] = useState(null);
     const [adjustments, setAdjustments] = useState([]);
+    const [financeSettings, setFinanceSettings] = useState({ tax_rate_percent: 0, deduction_rate_percent: 0 });
+    const [runDetailsOpen, setRunDetailsOpen] = useState(false);
+    const [runDetailsLoading, setRunDetailsLoading] = useState(false);
+    const [runDetails, setRunDetails] = useState(null);
+    const [runDetailsItems, setRunDetailsItems] = useState([]);
     const [warning, setWarning] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -22,6 +27,11 @@ export default function FinanceDashboard({ user, tenant_db }) {
     const [payrollForm, setPayrollForm] = useState({
         month: String(now.getMonth() + 1),
         year: String(now.getFullYear()),
+    });
+
+    const [settingsForm, setSettingsForm] = useState({
+        tax_rate_percent: '0',
+        deduction_rate_percent: '0',
     });
 
     const [adjustmentForm, setAdjustmentForm] = useState({
@@ -35,11 +45,51 @@ export default function FinanceDashboard({ user, tenant_db }) {
 
     const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
+    const appBaseUrl = () => {
+        const meta = document.querySelector('meta[name="app-base-url"]');
+        const v = meta?.getAttribute('content');
+        return (v || '').replace(/\/+$/, '');
+    };
+
+    const appBasePath = () => {
+        try {
+            const u = new URL(appBaseUrl() || window.location.href, window.location.href);
+            return (u.pathname || '').replace(/\/+$/, '');
+        } catch {
+            return '';
+        }
+    };
+
     const getCookie = (name) => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
         if (parts.length === 2) return parts.pop().split(';').shift();
         return null;
+    };
+
+    const saveFinanceSettings = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await fetchJson(route('tenant.finance.settings.update'), {
+                method: 'POST',
+                body: JSON.stringify({
+                    tax_rate_percent: Number(settingsForm.tax_rate_percent),
+                    deduction_rate_percent: Number(settingsForm.deduction_rate_percent),
+                }),
+            });
+            setSuccess('Company tax/deduction settings saved');
+            if (data?.settings) {
+                setFinanceSettings(data.settings);
+            }
+            await loadAuditReport();
+        } catch (e2) {
+            setError(e2?.message || 'Failed to save finance settings');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const xsrfTokenFromCookie = () => {
@@ -53,13 +103,18 @@ export default function FinanceDashboard({ user, tenant_db }) {
     };
 
     const normalizeSameOriginUrl = (url) => {
+        const basePath = appBasePath();
         try {
             const u = new URL(url, window.location.href);
-            if (u.origin !== window.location.origin) {
-                return `${u.pathname}${u.search}${u.hash}`;
+            const path = `${u.pathname}${u.search}${u.hash}`;
+            if (basePath && path.startsWith('/') && !path.startsWith(`${basePath}/`) && path !== basePath) {
+                return `${basePath}${path}`;
             }
-            return `${u.pathname}${u.search}${u.hash}`;
+            return path;
         } catch {
+            if (basePath && typeof url === 'string' && url.startsWith('/') && !url.startsWith(`${basePath}/`) && url !== basePath) {
+                return `${basePath}${url}`;
+            }
             return url;
         }
     };
@@ -138,9 +193,41 @@ export default function FinanceDashboard({ user, tenant_db }) {
         if (data?.warning) setWarning(String(data.warning));
     };
 
+    const openRunDetails = async (run) => {
+        const id = run?.id;
+        if (!id) return;
+        setRunDetailsOpen(true);
+        setRunDetailsLoading(true);
+        setRunDetails(null);
+        setRunDetailsItems([]);
+        try {
+            const data = await fetchJson(route('tenant.finance.payroll.runs.show', id));
+            if (data?.ok) {
+                setRunDetails(data?.run || null);
+                setRunDetailsItems(Array.isArray(data?.items) ? data.items : []);
+            }
+        } catch (e) {
+            setError(e?.message || 'Failed to load payroll run details');
+            setRunDetailsOpen(false);
+        } finally {
+            setRunDetailsLoading(false);
+        }
+    };
+
     const loadAuditReport = async () => {
         const data = await fetchJson(route('tenant.finance.audit.report'));
         setAuditReport(data?.report || null);
+        if (data?.warning) setWarning(String(data.warning));
+    };
+
+    const loadFinanceSettings = async () => {
+        const data = await fetchJson(route('tenant.finance.settings.get'));
+        const s = data?.settings || { tax_rate_percent: 0, deduction_rate_percent: 0 };
+        setFinanceSettings(s);
+        setSettingsForm({
+            tax_rate_percent: String(s?.tax_rate_percent ?? 0),
+            deduction_rate_percent: String(s?.deduction_rate_percent ?? 0),
+        });
         if (data?.warning) setWarning(String(data.warning));
     };
 
@@ -164,6 +251,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                 await loadPayrollRuns();
                 await loadAuditReport();
                 await loadAdjustments();
+                await loadFinanceSettings();
             } catch (e) {
                 if (!cancelled) setError(e?.message || 'Failed to load finance data');
             } finally {
@@ -246,6 +334,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
             await loadPayrollRuns();
             await loadAuditReport();
             await loadAdjustments();
+            await loadFinanceSettings();
             setSuccess('Refreshed');
         } catch (e) {
             setError(e?.message || 'Failed to refresh');
@@ -441,8 +530,10 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Period</th>
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Employees</th>
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Gross</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Tax</th>
+                                                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Deductions</th>
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Net</th>
-                                                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Export</th>
+                                                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -451,8 +542,17 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                         <td className="px-6 py-4 text-sm font-medium">{String(r.year).padStart(4, '0')}-{String(r.month).padStart(2, '0')}</td>
                                                         <td className="px-6 py-4 text-sm">{r.employees_count}</td>
                                                         <td className="px-6 py-4 text-sm">{r.total_gross}</td>
+                                                        <td className="px-6 py-4 text-sm">{r.total_tax ?? '0.00'}</td>
+                                                        <td className="px-6 py-4 text-sm">{r.total_deductions ?? '0.00'}</td>
                                                         <td className="px-6 py-4 text-sm">{r.total_net}</td>
                                                         <td className="px-6 py-4 text-sm text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openRunDetails(r)}
+                                                                className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 mr-2"
+                                                            >
+                                                                View
+                                                            </button>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => downloadUrl(route('tenant.finance.payroll.runs.export', r.id))}
@@ -465,13 +565,98 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                 ))}
                                                 {filteredPayrollRuns.length === 0 && (
                                                     <tr>
-                                                        <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No payroll runs yet.</td>
+                                                        <td colSpan="7" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No payroll runs yet.</td>
                                                     </tr>
                                                 )}
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
+
+                                {runDetailsOpen && (
+                                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                        <div className="absolute inset-0 bg-black/50" onClick={() => setRunDetailsOpen(false)} />
+                                        <div className="relative w-full max-w-5xl bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-lg font-bold">Payroll Run Details</div>
+                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                        {runDetails ? `${String(runDetails.year).padStart(4, '0')}-${String(runDetails.month).padStart(2, '0')} • Run #${runDetails.id}` : 'Loading…'}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRunDetailsOpen(false)}
+                                                    className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <FiX />
+                                                </button>
+                                            </div>
+
+                                            <div className="p-6">
+                                                {runDetailsLoading && (
+                                                    <div className="text-sm text-gray-600 dark:text-gray-400">Loading payroll items…</div>
+                                                )}
+
+                                                {!runDetailsLoading && (
+                                                    <div className="overflow-x-auto">
+                                                        <table className="min-w-full">
+                                                            <thead className="bg-gray-50 dark:bg-gray-900/50">
+                                                                <tr>
+                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Employee</th>
+                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Gross</th>
+                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bonus</th>
+                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deductions</th>
+                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax</th>
+                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                                {runDetailsItems.map((it) => (
+                                                                    <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                                                        <td className="px-4 py-3 text-sm">
+                                                                            <div className="font-medium">{it?.employee?.user?.name || `Employee #${it.employee_id}`}</div>
+                                                                            <div className="text-xs text-gray-500 dark:text-gray-400">{it?.employee?.user?.email || ''}</div>
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-sm">{it.gross}</td>
+                                                                        <td className="px-4 py-3 text-sm">{it.bonus_total ?? '0.00'}</td>
+                                                                        <td className="px-4 py-3 text-sm">{it.deduction_total ?? '0.00'}</td>
+                                                                        <td className="px-4 py-3 text-sm">{it.tax_total ?? '0.00'}</td>
+                                                                        <td className="px-4 py-3 text-sm">{it.net}</td>
+                                                                    </tr>
+                                                                ))}
+                                                                {!runDetailsLoading && runDetailsItems.length === 0 && (
+                                                                    <tr>
+                                                                        <td colSpan="6" className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No payroll items found for this run.</td>
+                                                                    </tr>
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                                                {runDetails?.id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => downloadUrl(route('tenant.finance.payroll.runs.export', runDetails.id))}
+                                                        className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                    >
+                                                        <FiDownload className="mr-2" /> Export CSV
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRunDetailsOpen(false)}
+                                                    className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    Close
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -510,12 +695,72 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <div className="text-2xl font-bold mt-1">{auditReport?.last_payroll ? `${String(auditReport.last_payroll.year).padStart(4, '0')}-${String(auditReport.last_payroll.month).padStart(2, '0')}` : '-'}</div>
                                         </div>
                                     </div>
+
+                                    <div className="mt-6 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">Company rates</div>
+                                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">Tax rate</div>
+                                                <div className="text-lg font-semibold">{auditReport?.tax_rate_percent ?? 0}%</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">Deduction rate</div>
+                                                <div className="text-lg font-semibold">{auditReport?.deduction_rate_percent ?? 0}%</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {activeTab === 'tax' && (
                             <div className="space-y-6">
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-semibold">Company Tax & Deduction Settings</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">These rates are applied to gross salary for every payroll run (you can still add per-employee adjustments below).</p>
+
+                                    <form onSubmit={saveFinanceSettings} className="mt-5 grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium mb-1">Tax rate (%)</label>
+                                            <input
+                                                value={settingsForm.tax_rate_percent}
+                                                onChange={(e) => setSettingsForm((p) => ({ ...p, tax_rate_percent: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium mb-1">Deduction rate (%)</label>
+                                            <input
+                                                value={settingsForm.deduction_rate_percent}
+                                                onChange={(e) => setSettingsForm((p) => ({ ...p, deduction_rate_percent: e.target.value }))}
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <button
+                                                disabled={loading}
+                                                className="w-full md:w-auto inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg shadow-sm hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60"
+                                            >
+                                                <FiPlus className="mr-2" /> {loading ? 'Saving...' : 'Save Rates'}
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                                        Current: tax {financeSettings?.tax_rate_percent ?? 0}%, deductions {financeSettings?.deduction_rate_percent ?? 0}%
+                                    </div>
+                                </div>
+
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                     <h3 className="text-lg font-semibold">Tax & Deduction Adjustments</h3>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Add one-time deductions, taxes, or bonuses for a specific month.</p>

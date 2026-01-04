@@ -13,6 +13,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [editingItem, setEditingItem] = useState(null);
+    const [wifiDetectLoading, setWifiDetectLoading] = useState(false);
+    const [wifiDetectError, setWifiDetectError] = useState('');
 
     const { auth } = usePage().props;
     const user = auth?.user || {};
@@ -39,6 +41,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         company_wifi_allowed_ips: "",
         company_wifi_allowed_cidrs: "",
         requires_fingerprint: false,
+        requires_visual_confirmation: false,
+        visual_confirmation_message: "",
     });
 
     const [roleForm, setRoleForm] = useState({ name: "", display_name: "", description: "", permissions: [] });
@@ -53,6 +57,71 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     const handleAttendancePolicyChange = (e) => {
         const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
         setAttendancePolicyForm({ ...attendancePolicyForm, [e.target.name]: value });
+    };
+
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    };
+
+    const xsrfTokenFromCookie = () => {
+        const v = getCookie('XSRF-TOKEN');
+        if (!v) return null;
+        try {
+            return decodeURIComponent(v);
+        } catch {
+            return v;
+        }
+    };
+
+    const csrfTokenFromMeta = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    const requestHeaders = (extra = {}) => ({
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(csrfTokenFromMeta() ? { 'X-CSRF-TOKEN': csrfTokenFromMeta() } : {}),
+        ...(xsrfTokenFromCookie() ? { 'X-XSRF-TOKEN': xsrfTokenFromCookie() } : {}),
+        ...extra,
+    });
+
+    const detectWifi = async () => {
+        setWifiDetectError('');
+        setWifiDetectLoading(true);
+        try {
+            const res = await fetch(route('company-admin.attendance-policies.detect-wifi'), {
+                method: 'GET',
+                credentials: 'include',
+                headers: requestHeaders(),
+            });
+
+            const raw = await res.text();
+            const data = (() => {
+                try {
+                    return raw ? JSON.parse(raw) : {};
+                } catch {
+                    return { ok: false, error: raw };
+                }
+            })();
+
+            if (!res.ok || !data?.ok) {
+                const msg = data?.error || data?.message || 'Failed to detect Wi-Fi IP.';
+                setWifiDetectError(`${msg}${res?.status ? ` (HTTP ${res.status})` : ''}`);
+                return;
+            }
+
+            setAttendancePolicyForm((prev) => ({
+                ...prev,
+                requires_company_wifi: true,
+                company_wifi_allowed_ips: String(data?.ip || '').trim(),
+                company_wifi_allowed_cidrs: String(data?.suggested_cidr || '').trim(),
+            }));
+        } catch (e) {
+            setWifiDetectError('Network error. Please try again.');
+        } finally {
+            setWifiDetectLoading(false);
+        }
     };
     const handleRoleChange = (e) => setRoleForm({ ...roleForm, [e.target.name]: e.target.value });
 
@@ -117,7 +186,9 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
             requires_company_wifi: Boolean(policy.requires_company_wifi),
             company_wifi_allowed_ips: policy.company_wifi_allowed_ips || "",
             company_wifi_allowed_cidrs: policy.company_wifi_allowed_cidrs || "",
-            requires_fingerprint: Boolean(policy.requires_fingerprint),
+            requires_fingerprint: false,
+            requires_visual_confirmation: Boolean(policy.requires_visual_confirmation),
+            visual_confirmation_message: policy.visual_confirmation_message || "",
         });
         setShowAttendancePolicyForm(true);
     };
@@ -222,6 +293,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                     company_wifi_allowed_ips: "",
                     company_wifi_allowed_cidrs: "",
                     requires_fingerprint: false,
+                    requires_visual_confirmation: false,
+                    visual_confirmation_message: "",
                 });
             }
         });
@@ -995,6 +1068,24 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
 
                                     {attendancePolicyForm.requires_company_wifi && (
                                         <div className="grid grid-cols-1 gap-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                <div className="text-sm text-gray-500">
+                                                    Click Detect while connected to your company Wi-Fi.
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={detectWifi}
+                                                    disabled={wifiDetectLoading}
+                                                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold rounded-lg shadow-sm"
+                                                >
+                                                    {wifiDetectLoading ? 'Detecting...' : 'Detect Wi-Fi IP/CIDR'}
+                                                </button>
+                                            </div>
+
+                                            {wifiDetectError && (
+                                                <div className="text-sm text-red-600">{wifiDetectError}</div>
+                                            )}
+
                                             <div>
                                                 <label className="block text-sm font-medium mb-2">Allowed IPs (comma separated)</label>
                                                 <input
@@ -1022,19 +1113,33 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
 
                                     <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
                                         <div>
-                                            <div className="font-semibold">Fingerprint Restriction</div>
-                                            <div className="text-sm text-gray-500">Require fingerprint verification before check in/out.</div>
+                                            <div className="font-semibold">Visual Confirmation</div>
+                                            <div className="text-sm text-gray-500">Require employees to take a photo before check in/out.</div>
                                         </div>
                                         <label className="inline-flex items-center gap-2">
                                             <input
                                                 type="checkbox"
-                                                name="requires_fingerprint"
-                                                checked={Boolean(attendancePolicyForm.requires_fingerprint)}
+                                                name="requires_visual_confirmation"
+                                                checked={Boolean(attendancePolicyForm.requires_visual_confirmation)}
                                                 onChange={handleAttendancePolicyChange}
                                                 className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                                             />
                                         </label>
                                     </div>
+
+                                    {attendancePolicyForm.requires_visual_confirmation && (
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Visual Confirmation Message (optional)</label>
+                                            <input
+                                                type="text"
+                                                name="visual_confirmation_message"
+                                                value={attendancePolicyForm.visual_confirmation_message}
+                                                onChange={handleAttendancePolicyChange}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700"
+                                                placeholder="Please take a photo to confirm you are in the building"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end space-x-3 pt-4">

@@ -394,98 +394,203 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                     {activeTab === "dashboard" && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {/* Total Tenants Card */}
-                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tenants</p>
-                                            <p className="text-3xl font-bold mt-1">{tenants?.length || 0}</p>
+                                            <p className="text-white/80 text-sm mb-1">Total Tenants</p>
+                                            <p className="text-3xl font-bold">{tenants?.length || 0}</p>
                                         </div>
-                                        <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
-                                            <FiUsers className="w-6 h-6" />
-                                        </div>
+                                        <FiUsers className="h-10 w-10 text-white/80" />
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Active now</p>
-                                    </div>
+                                    <div className="mt-4 text-xs text-white/80">Provisioned tenant databases</div>
                                 </div>
 
-                                {/* Active Subscriptions Card */}
-                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
-                                            <p className="text-3xl font-bold mt-1">
+                                            <p className="text-white/80 text-sm mb-1">Active Subscriptions</p>
+                                            <p className="text-3xl font-bold">
                                                 {subscriptionPlans?.reduce((acc, plan) => acc + (plan.subscriptions_count || 0), 0) || 0}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-200">
-                                            <FiCreditCard className="w-6 h-6" />
-                                        </div>
+                                        <FiCreditCard className="h-10 w-10 text-white/80" />
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                        <p className="text-sm text-green-600 dark:text-green-400">+2.5% from last month</p>
-                                    </div>
+                                    <div className="mt-4 text-xs text-white/80">Across all plans</div>
                                 </div>
 
-                                {/* Pending Applications Card */}
-                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Applications</p>
-                                            <p className="text-3xl font-bold mt-1">{paidApplications?.length || 0}</p>
+                                            <p className="text-white/80 text-sm mb-1">Pending Applications</p>
+                                            <p className="text-3xl font-bold">{visiblePaidApplications?.length || 0}</p>
                                         </div>
-                                        <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-200">
-                                            <FiFileText className="w-6 h-6" />
-                                        </div>
+                                        <FiFileText className="h-10 w-10 text-white/80" />
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Needs review</p>
-                                    </div>
+                                    <div className="mt-4 text-xs text-white/80">Paid, not provisioned yet</div>
                                 </div>
 
-                                {/* Revenue Card */}
-                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                                <div className="bg-gradient-to-br from-purple-500 to-fuchsia-600 rounded-xl shadow-lg p-6 text-white">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Revenue</p>
-                                            <p className="text-3xl font-bold mt-1">
-                                                ${subscriptionPlans?.reduce((acc, plan) => acc + ((plan.price || 0) * (plan.subscriptions_count || 0)), 0).toLocaleString() || '0'}
+                                            <p className="text-white/80 text-sm mb-1">Estimated Revenue</p>
+                                            <p className="text-3xl font-bold">
+                                                ${(
+                                                    subscriptionPlans?.reduce(
+                                                        (acc, plan) => acc + ((Number(plan.price) || 0) * (plan.subscriptions_count || 0)),
+                                                        0
+                                                    ) || 0
+                                                ).toLocaleString()}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-200">
-                                            <FiDollarSign className="w-6 h-6" />
-                                        </div>
+                                        <FiDollarSign className="h-10 w-10 text-white/80" />
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                        <p className="text-sm text-green-600 dark:text-green-400">+12.3% from last month</p>
-                                    </div>
+                                    <div className="mt-4 text-xs text-white/80">Based on plan price × subscriptions</div>
                                 </div>
                             </div>
 
-                            {/* Recent Activity Section */}
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-lg font-semibold">Recent Activity</h2>
-                                    <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">View All</button>
-                                </div>
-                                <div className="space-y-4">
-                                    {tenants?.slice(0, 5).map((tenant, index) => (
-                                        <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                                                    <FiUser className="w-5 h-5 text-blue-600 dark:text-blue-300" />
-                                                </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h2 className="text-lg font-semibold">Quick Actions</h2>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Common admin operations</p>
+
+                                    <div className="mt-5 grid sm:grid-cols-2 gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTenantForm(true)}
+                                            className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 hover:bg-gray-100 dark:hover:bg-gray-900/60 transition-colors text-left"
+                                        >
+                                            <div className="flex items-center justify-between">
                                                 <div>
-                                                    <p className="font-medium">New tenant registered</p>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">{tenant.name}</p>
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tenants</div>
+                                                    <div className="text-base font-semibold text-gray-900 dark:text-white">Create Tenant</div>
+                                                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Provision a new tenant database</div>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                                                    <FiUsers className="h-6 w-6" />
                                                 </div>
                                             </div>
-                                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                                                {new Date(tenant.created_at).toLocaleDateString()}
-                                            </span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPlanForm(true)}
+                                            className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 hover:bg-gray-100 dark:hover:bg-gray-900/60 transition-colors text-left"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Plans</div>
+                                                    <div className="text-base font-semibold text-gray-900 dark:text-white">Create Plan</div>
+                                                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Add a subscription plan</div>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                                                    <FiCreditCard className="h-6 w-6" />
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveTab('paidApps')}
+                                            className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 hover:bg-gray-100 dark:hover:bg-gray-900/60 transition-colors text-left"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Applications</div>
+                                                    <div className="text-base font-semibold text-gray-900 dark:text-white">Review Paid Apps</div>
+                                                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Create tenants from payments</div>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                                                    <FiFileText className="h-6 w-6" />
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveTab('users')}
+                                            className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 hover:bg-gray-100 dark:hover:bg-gray-900/60 transition-colors text-left"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Admin</div>
+                                                    <div className="text-base font-semibold text-gray-900 dark:text-white">Manage Users</div>
+                                                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Super admin accounts</div>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                                                    <FiUser className="h-6 w-6" />
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                                            <h2 className="text-lg font-semibold">Recent Tenants</h2>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Latest provisioned tenants</p>
                                         </div>
-                                    ))}
+                                        <div className="p-6 space-y-3">
+                                            {(tenants || []).slice(0, 4).map((t) => (
+                                                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-transparent dark:border-gray-700">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Tenant #{t.id}</div>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{t.database}</div>
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {t.created_at ? new Date(t.created_at).toLocaleDateString() : ''}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(tenants || []).length === 0 && (
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">No tenants yet.</div>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTab('tenants')}
+                                                className="w-full mt-2 inline-flex justify-center items-center px-4 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200"
+                                            >
+                                                View Tenants
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                                            <h2 className="text-lg font-semibold">Pending Provisioning</h2>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Paid applications ready to create</p>
+                                        </div>
+                                        <div className="p-6 space-y-3">
+                                            {(visiblePaidApplications || []).slice(0, 3).map((app) => (
+                                                <div key={app.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-transparent dark:border-gray-700">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-sm font-semibold text-gray-900 dark:text-white">{app.company_name}</div>
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400">{app.email}</div>
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Plan: <span className="capitalize">{app.plan}</span></div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startTenantFromApplication(app)}
+                                                            className="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700"
+                                                        >
+                                                            Create
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(visiblePaidApplications || []).length === 0 && (
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">No pending applications.</div>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTab('paidApps')}
+                                                className="w-full mt-2 inline-flex justify-center items-center px-4 py-2 rounded-lg text-sm font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200"
+                                            >
+                                                Review Applications
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
