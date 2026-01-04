@@ -23,6 +23,9 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\TenantApplicationController;
 use App\Http\Controllers\SubscriptionPlanController;
 use App\Http\Controllers\SuperAdmin\SuperAdminUserController;
+use App\Http\Controllers\BiometricController;
+use App\Http\Controllers\FaceVerificationController;
+use App\Http\Controllers\VisualConfirmationController;
 use App\Models\AttendancePolicy;
 
 // -------------------
@@ -86,13 +89,37 @@ Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 	Route::prefix('tenant/employee')->name('tenant.employee.')->group(function () {
 		Route::get('/leave-requests', [TenantEmployeeController::class, 'listLeaveRequests'])->name('leave.index');
 		Route::post('/leave-requests', [TenantEmployeeController::class, 'storeLeaveRequest'])->name('leave.store');
+		Route::get('/payslips', [TenantEmployeeController::class, 'listPayslips'])->name('payslips.index');
+		Route::get('/payslips/{payrollId}', [TenantEmployeeController::class, 'showPayslip'])->name('payslips.show');
+		Route::get('/payslips/{payrollId}/export', [TenantEmployeeController::class, 'exportPayslipCsv'])->name('payslips.export');
 		Route::post('/attendance/check-in', [TenantEmployeeController::class, 'checkIn'])->name('attendance.check_in');
 		Route::post('/attendance/check-out', [TenantEmployeeController::class, 'checkOut'])->name('attendance.check_out');
+		
+		// Face enrollment (visual registration)
+		Route::get('/face/status', [FaceVerificationController::class, 'status'])->name('face.status');
+		Route::post('/face/enroll', [FaceVerificationController::class, 'enroll'])->name('face.enroll');
+		
+		// Biometric authentication routes
+		Route::get('/biometric/registration-options', [BiometricController::class, 'getRegistrationOptions'])->name('biometric.registration_options');
+		Route::post('/biometric/register', [BiometricController::class, 'registerFingerprint'])->name('biometric.register');
+		Route::get('/biometric/authentication-options', [BiometricController::class, 'getAuthenticationOptions'])->name('biometric.authentication_options');
+		Route::post('/biometric/verify', [BiometricController::class, 'verifyFingerprint'])->name('biometric.verify');
+		Route::get('/biometric/status', [BiometricController::class, 'checkVerificationStatus'])->name('biometric.status');
+		Route::get('/biometric/registration-status', [BiometricController::class, 'getRegistrationStatus'])->name('biometric.registration_status');
+		Route::post('/biometric/remove', [BiometricController::class, 'removeFingerprint'])->name('biometric.remove');
+		
+		// Visual confirmation routes
+		Route::post('/visual-confirmation', [VisualConfirmationController::class, 'store'])->name('visual_confirmation.store');
+		Route::get('/visual-confirmation/status', [VisualConfirmationController::class, 'status'])->name('visual_confirmation.status');
+		Route::delete('/visual-confirmation', [VisualConfirmationController::class, 'clear'])->name('visual_confirmation.clear');
 	});
 
 	Route::middleware([EnsureFinanceManager::class])->prefix('tenant/finance')->name('tenant.finance.')->group(function () {
+		Route::get('/settings', [TenantFinanceController::class, 'getFinanceSettings'])->name('settings.get');
+		Route::post('/settings', [TenantFinanceController::class, 'updateFinanceSettings'])->name('settings.update');
 		Route::get('/employees', [TenantFinanceController::class, 'listEmployees'])->name('employees.index');
 		Route::get('/payroll/runs', [TenantFinanceController::class, 'listPayrollRuns'])->name('payroll.runs.index');
+		Route::get('/payroll/runs/{id}', [TenantFinanceController::class, 'showPayrollRun'])->name('payroll.runs.show');
 		Route::post('/payroll/run', [TenantFinanceController::class, 'runMonthlyPayroll'])->name('payroll.run');
 		Route::get('/payroll/runs/{id}/export', [TenantFinanceController::class, 'exportPayrollRunCsv'])->name('payroll.runs.export');
 		Route::get('/adjustments', [TenantFinanceController::class, 'listAdjustments'])->name('adjustments.index');
@@ -102,6 +129,8 @@ Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 	});
 
 	Route::middleware([EnsureDepartmentManager::class])->prefix('tenant/manager')->name('tenant.manager.')->group(function () {
+		Route::get('/attendance/visual-confirmation/{attendanceLogId}', [VisualConfirmationController::class, 'getImage'])->name('attendance.visual_confirmation_image');
+		
 		Route::get('/team', [TenantDepartmentManagerController::class, 'teamOverview'])->name('team.overview');
 		Route::get('/leave-requests', [TenantDepartmentManagerController::class, 'listTeamLeaveRequests'])->name('leave.index');
 		Route::post('/leave-requests/{id}/approve', [TenantDepartmentManagerController::class, 'approveLeaveRequest'])->name('leave.approve');
@@ -183,6 +212,8 @@ Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 				'policy_name' => optional($policy)->policy_name,
 				'requires_company_wifi' => (bool) optional($policy)->requires_company_wifi,
 				'requires_fingerprint' => (bool) optional($policy)->requires_fingerprint,
+				'requires_visual_confirmation' => (bool) optional($policy)->requires_visual_confirmation,
+				'visual_confirmation_message' => optional($policy)->visual_confirmation_message,
 			],
 		]);
 	})->name('tenant.attendance.policy');
@@ -225,6 +256,8 @@ Route::middleware([SwitchTenantDatabase::class, 'auth', EnsureCompanyAdmin::clas
     Route::post('/attendance-policies', [CompanyAdminController::class, 'storeAttendancePolicy'])->name('attendance-policies.store');
     Route::put('/attendance-policies/{id}', [CompanyAdminController::class, 'updateAttendancePolicy'])->name('attendance-policies.update');
     Route::delete('/attendance-policies/{id}', [CompanyAdminController::class, 'destroyAttendancePolicy'])->name('attendance-policies.destroy');
+
+    Route::get('/attendance-policies/detect-wifi', [CompanyAdminController::class, 'detectCompanyWifi'])->name('attendance-policies.detect-wifi');
 
     // Role Management (RBAC)
     Route::post('/roles', [CompanyAdminController::class, 'storeRole'])->name('roles.store');
