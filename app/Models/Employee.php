@@ -21,11 +21,22 @@ class Employee extends Model
         'employment_type',
         'status',
         'cv',
+        'fingerprint_template',
+        'fingerprint_registered_at',
+        'webauthn_credentials',
+        'face_enrollment_image',
+        'face_enrollment_hash',
+        'face_descriptor',
+        'face_enrolled_at',
     ];
 
     protected $casts = [
         'hire_date' => 'date',
         'salary' => 'decimal:2',
+        'fingerprint_registered_at' => 'datetime',
+        'webauthn_credentials' => 'array',
+        'face_descriptor' => 'array',
+        'face_enrolled_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
