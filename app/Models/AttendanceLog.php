@@ -16,10 +16,15 @@ class AttendanceLog extends Model
         'ip_address',
         'wifi_verified',
         'fingerprint_verified',
+        'visual_confirmed_at',
+        'visual_confirmation_image',
+        'visual_confirmation_ip',
+        'visual_confirmed_by',
     ];
 
     protected $casts = [
         'logged_at' => 'datetime',
+        'visual_confirmed_at' => 'datetime',
         'wifi_verified' => 'boolean',
         'fingerprint_verified' => 'boolean',
     ];
