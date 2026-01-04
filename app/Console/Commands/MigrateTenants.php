@@ -101,6 +101,26 @@ class MigrateTenants extends Command
                         '--database' => 'Tenant',
                         '--force' => true,
                     ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_26_000001_add_fingerprint_template_to_employees_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_27_000001_add_face_enrollment_to_employees_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_26_000002_add_visual_confirmation_to_attendance_logs.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_26_000003_add_requires_visual_confirmation_to_attendance_policies.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
                 } else {
                     Artisan::call('migrate', [
                         '--path' => 'database/migrations/tenant',
@@ -158,6 +178,26 @@ class MigrateTenants extends Command
                     ]);
                     Artisan::call('migrate', [
                         '--path' => 'database/migrations/tenant/2025_12_24_000012_ensure_finance_and_reviews_schema.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_26_000001_add_fingerprint_template_to_employees_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_27_000001_add_face_enrollment_to_employees_table.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_26_000002_add_visual_confirmation_to_attendance_logs.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_12_26_000003_add_requires_visual_confirmation_to_attendance_policies.php',
                         '--database' => 'Tenant',
                         '--force' => true,
                     ]);
