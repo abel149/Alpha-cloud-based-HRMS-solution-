@@ -10,12 +10,56 @@ use App\Models\Role;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class CompanyAdminController extends Controller
 {
+    private function ensureAttendancePolicyVisualSchema(): void
+    {
+        if (!Schema::connection('Tenant')->hasTable('attendance_policies')) {
+            return;
+        }
+
+        $needsRequires = !Schema::connection('Tenant')->hasColumn('attendance_policies', 'requires_visual_confirmation');
+        $needsMessage = !Schema::connection('Tenant')->hasColumn('attendance_policies', 'visual_confirmation_message');
+
+        if (!$needsRequires && !$needsMessage) {
+            return;
+        }
+
+        try {
+            Schema::connection('Tenant')->table('attendance_policies', function (Blueprint $table) use ($needsRequires, $needsMessage) {
+                if ($needsRequires) {
+                    $table->boolean('requires_visual_confirmation')->default(false);
+                }
+                if ($needsMessage) {
+                    $table->text('visual_confirmation_message')->nullable();
+                }
+            });
+        } catch (\Throwable $e) {
+            // Fallback for tenants with unusual schema state
+            try {
+                if ($needsRequires) {
+                    DB::connection('Tenant')->statement('ALTER TABLE attendance_policies ADD COLUMN requires_visual_confirmation TINYINT(1) NOT NULL DEFAULT 0');
+                }
+            } catch (\Throwable $ignored) {
+                // ignore
+            }
+
+            try {
+                if ($needsMessage) {
+                    DB::connection('Tenant')->statement('ALTER TABLE attendance_policies ADD COLUMN visual_confirmation_message TEXT NULL');
+                }
+            } catch (\Throwable $ignored) {
+                // ignore
+            }
+        }
+    }
+
     public function index()
     {
         try {
@@ -278,25 +322,10 @@ class CompanyAdminController extends Controller
 
     public function storeAttendancePolicy(Request $request)
     {
-        $request->validate([
-            'policy_name' => 'required|string|max:255',
-            'work_start_time' => 'required',
-            'work_end_time' => 'required',
-            'grace_period_minutes' => 'integer|min:0',
-            'minimum_work_hours' => 'integer|min:1',
-            'requires_company_wifi' => 'nullable|boolean',
-            'company_wifi_allowed_ips' => 'nullable|string',
-            'company_wifi_allowed_cidrs' => 'nullable|string',
-            'requires_fingerprint' => 'nullable|boolean',
-        ]);
+        $this->ensureAttendancePolicyVisualSchema();
 
-        AttendancePolicy::create($request->all());
-        return back()->with('success', 'Attendance policy created successfully');
-    }
-
-    public function updateAttendancePolicy(Request $request, $id)
-    {
-        $policy = AttendancePolicy::findOrFail($id);
+        $hasVisualColumns = Schema::connection('Tenant')->hasColumn('attendance_policies', 'requires_visual_confirmation')
+            && Schema::connection('Tenant')->hasColumn('attendance_policies', 'visual_confirmation_message');
 
         $request->validate([
             'policy_name' => 'required|string|max:255',
@@ -308,9 +337,14 @@ class CompanyAdminController extends Controller
             'company_wifi_allowed_ips' => 'nullable|string',
             'company_wifi_allowed_cidrs' => 'nullable|string',
             'requires_fingerprint' => 'nullable|boolean',
+            'requires_visual_confirmation' => 'nullable|boolean',
+            'visual_confirmation_message' => 'nullable|string',
         ]);
 
-        $policy->update($request->only(
+        // Keep a single active policy to avoid confusion.
+        AttendancePolicy::query()->update(['is_active' => false]);
+
+        $payload = $request->only(
             'policy_name',
             'work_start_time',
             'work_end_time',
@@ -319,8 +353,94 @@ class CompanyAdminController extends Controller
             'requires_company_wifi',
             'company_wifi_allowed_ips',
             'company_wifi_allowed_cidrs',
-            'requires_fingerprint'
-        ));
+            'requires_fingerprint',
+            'requires_visual_confirmation',
+            'visual_confirmation_message'
+
+        );
+
+        if (!$hasVisualColumns) {
+            unset($payload['requires_visual_confirmation'], $payload['visual_confirmation_message']);
+        }
+
+        // If visual confirmation is enabled, do not require biometric/passkey.
+        if (!empty($payload['requires_visual_confirmation'])) {
+            $payload['requires_fingerprint'] = false;
+        }
+
+        if (!$hasVisualColumns && $request->boolean('requires_visual_confirmation')) {
+            return back()->with('error', 'Tenant database is missing visual confirmation columns. Run: php artisan migrate:tenants');
+        }
+
+        // Fingerprint/passkey attendance is not supported in the desired workflow.
+        $payload['requires_fingerprint'] = false;
+
+        $payload['is_active'] = true;
+
+        AttendancePolicy::create($payload);
+        return back()->with('success', 'Attendance policy created successfully');
+    }
+
+    public function updateAttendancePolicy(Request $request, $id)
+    {
+        $policy = AttendancePolicy::findOrFail($id);
+
+        $this->ensureAttendancePolicyVisualSchema();
+
+        $hasVisualColumns = Schema::connection('Tenant')->hasColumn('attendance_policies', 'requires_visual_confirmation')
+            && Schema::connection('Tenant')->hasColumn('attendance_policies', 'visual_confirmation_message');
+
+        $request->validate([
+            'policy_name' => 'required|string|max:255',
+            'work_start_time' => 'required',
+            'work_end_time' => 'required',
+            'grace_period_minutes' => 'integer|min:0',
+            'minimum_work_hours' => 'integer|min:1',
+            'requires_company_wifi' => 'nullable|boolean',
+            'company_wifi_allowed_ips' => 'nullable|string',
+            'company_wifi_allowed_cidrs' => 'nullable|string',
+            'requires_fingerprint' => 'nullable|boolean',
+            'requires_visual_confirmation' => 'nullable|boolean',
+            'visual_confirmation_message' => 'nullable|string',
+        ]);
+
+        // Keep a single active policy to avoid confusion.
+        AttendancePolicy::where('id', '!=', $policy->id)->update(['is_active' => false]);
+
+        $payload = $request->only(
+            'policy_name',
+            'work_start_time',
+            'work_end_time',
+            'grace_period_minutes',
+            'minimum_work_hours',
+            'requires_company_wifi',
+            'company_wifi_allowed_ips',
+            'company_wifi_allowed_cidrs',
+            'requires_fingerprint',
+            'requires_visual_confirmation',
+            'visual_confirmation_message'
+
+        );
+
+        if (!$hasVisualColumns) {
+            unset($payload['requires_visual_confirmation'], $payload['visual_confirmation_message']);
+        }
+
+        // If visual confirmation is enabled, do not require biometric/passkey.
+        if (!empty($payload['requires_visual_confirmation'])) {
+            $payload['requires_fingerprint'] = false;
+        }
+
+        if (!$hasVisualColumns && $request->boolean('requires_visual_confirmation')) {
+            return back()->with('error', 'Tenant database is missing visual confirmation columns. Run: php artisan migrate:tenants');
+        }
+
+        // Fingerprint/passkey attendance is not supported in the desired workflow.
+        $payload['requires_fingerprint'] = false;
+
+        $payload['is_active'] = true;
+
+        $policy->update($payload);
 
         return back()->with('success', 'Attendance policy updated successfully');
     }
@@ -380,5 +500,32 @@ class CompanyAdminController extends Controller
         $role->delete();
 
         return back()->with('success', 'Role deleted successfully');
+    }
+
+    public function detectCompanyWifi(Request $request)
+    {
+        $ip = (string) $request->ip();
+
+        $suggestedCidr = null;
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $ip);
+            if (count($parts) === 4) {
+                $a = (int) $parts[0];
+                $b = (int) $parts[1];
+                $isPrivate = ($a === 10)
+                    || ($a === 192 && $b === 168)
+                    || ($a === 172 && $b >= 16 && $b <= 31);
+
+                if ($isPrivate) {
+                    $suggestedCidr = sprintf('%d.%d.%d.0/24', $a, $b, (int) $parts[2]);
+                }
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'ip' => $ip,
+            'suggested_cidr' => $suggestedCidr,
+        ]);
     }
 }
