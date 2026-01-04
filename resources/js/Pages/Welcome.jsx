@@ -1,4 +1,4 @@
-import { Head, Link, useForm, router as Inertia } from '@inertiajs/inertia-react';
+import { Head, Link, useForm } from '@inertiajs/inertia-react';
 import { FiArrowRight, FiCheckCircle, FiMenu, FiX, FiMoon, FiSun, FiLock, FiMail, FiUser, FiEye, FiEyeOff, FiLogIn, FiBriefcase } from 'react-icons/fi';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -98,7 +98,7 @@ function LoginForm({ onClose }) {
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('login'), {
+        post('login', {
             preserveScroll: true,
             onSuccess: () => {
                 // Clear saved login data on successful login
@@ -137,7 +137,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
         } else {
             url.searchParams.delete('modal');
         }
-        window.history.pushState({}, '', url);
+        window.history.pushState({}, '', url.toString());
         setActiveModal(modalName);
     };
 
@@ -171,7 +171,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post(route('login'), {
+        post('login', {
             onFinish: () => reset('password'),
 
             onSuccess: () => closeLoginModal()
@@ -191,6 +191,17 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
         setDarkMode(!darkMode);
         document.documentElement.classList.toggle('dark');
     };
+
+    const loginHref = () => {
+        try {
+            if (typeof route === 'function') {
+                return route('login');
+            }
+        } catch {
+        }
+        return 'login';
+    };
+
     return (
         <div className={`min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all duration-300 ${activeModal === 'login' ? 'overflow-hidden' : ''} relative`}>
             {/* Blur overlay for main content */}
@@ -417,6 +428,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                 {darkMode ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
                             </button>
                             <button
+                                type="button"
                                 onClick={openLoginModal}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition flex items-center justify-center"
                             >
