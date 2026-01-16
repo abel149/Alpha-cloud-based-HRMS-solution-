@@ -308,8 +308,3 @@ After updating environment variables, **redeploy** the service to apply changes.
 - Regularly back up both central and tenant databases.
 - Restrict direct database access to trusted hosts/networks.
 
----
-
-## License
-
-This project is licensed under the **MIT License** (inherited from the Laravel skeleton), unless you apply a different license for your customized distribution.
