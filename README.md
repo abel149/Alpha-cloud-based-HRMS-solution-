@@ -1,5 +1,4 @@
-Alpha Cloud-based HRMS Solution
-================================
+# Alpha Cloud-based HRMS Solution
 
 Alpha is a modern, multi-tenant **Human Resource Management System (HRMS)** built with **Laravel 12**, **Inertia.js**, and a **React** frontend. It is designed for SaaS-style deployments where a single platform hosts multiple tenant companies, each with its own isolated employee data, HR workflows, and payroll.
 
@@ -9,16 +8,16 @@ This document explains the architecture, features, tech stack, and how to run an
 
 ## Table of Contents
 
-- **Overview**
-- **Key Features**
-- **Architecture & Tech Stack**
-- **Core Domains & Roles**
-- **Local Development Setup**
-- **Database & Multi-tenancy**
-- **Running the Application**
-- **Testing**
-- **Deployment Notes (Railway)**
-- **Security & Best Practices**
+-   **Overview**
+-   **Key Features**
+-   **Architecture & Tech Stack**
+-   **Core Domains & Roles**
+-   **Local Development Setup**
+-   **Database & Multi-tenancy**
+-   **Running the Application**
+-   **Testing**
+-   **Deployment Notes (Railway)**
+-   **Security & Best Practices**
 
 ---
 
@@ -26,10 +25,10 @@ This document explains the architecture, features, tech stack, and how to run an
 
 Alpha HRMS provides an end-to-end HR and payroll platform for organizations, with support for:
 
-- Centralized **Super Admin** control over tenants and subscription plans.
-- Per-tenant databases for **data isolation** and easier scaling.
-- Role-based dashboards for **HR**, **Finance**, **Department Managers**, and **Employees**.
-- Attendance, leave management, performance reviews, and payroll processing.
+-   Centralized **Super Admin** control over tenants and subscription plans.
+-   Per-tenant databases for **data isolation** and easier scaling.
+-   Role-based dashboards for **HR**, **Finance**, **Department Managers**, and **Employees**.
+-   Attendance, leave management, performance reviews, and payroll processing.
 
 The platform is suitable for production SaaS deployments and can be hosted on services like **Railway**, **VPS**, or other cloud providers that support PHP and MySQL.
 
@@ -37,73 +36,80 @@ The platform is suitable for production SaaS deployments and can be hosted on se
 
 ## Key Features
 
-- **Multi-Tenant Architecture**
-  - Central ("main") database for platform users, tenants, and subscriptions.
-  - Separate tenant databases for each company to keep HR data isolated.
-  - Middleware-based tenant resolution and database switching.
+-   **Multi-Tenant Architecture**
 
-- **Role-Based Dashboards**
-  - **Super Admin**
-    - Manage tenants (create, update, delete).
-    - Manage subscription plans.
-    - View and manage platform-level users.
-  - **Company Admin**
-    - Manage employees, departments, and roles.
-    - Configure leave and attendance policies.
-  - **HR Manager**
-    - Manage employees and leave requests.
-    - View and manage attendance logs.
-  - **Finance Manager**
-    - Run monthly payroll for all active employees.
-    - Manage payroll adjustments and view audit reports.
-  - **Department Manager**
-    - View department team, leave requests, attendance summaries.
-    - Submit and manage performance reviews.
-  - **Employee**
-    - Submit leave requests.
-    - View payslips.
-    - Check in / check out attendance with optional biometric and visual confirmation.
+    -   Central ("main") database for platform users, tenants, and subscriptions.
+    -   Separate tenant databases for each company to keep HR data isolated.
+    -   Middleware-based tenant resolution and database switching.
 
-- **Attendance & Leave Management**
-  - Attendance policies: work times, grace periods, Wi-Fi restrictions, biometric/visual confirmation requirements.
-  - Leave policies: leave types, annual entitlements, paid/unpaid, approval requirements.
-  - Attendance logs with metadata including IP, Wi-Fi verification, and biometric/visual checks.
+-   **Role-Based Dashboards**
 
-- **Payroll Engine**
-  - Monthly payroll runs per tenant.
-  - Processes all active employees with gross pay, adjustments, deductions, and tax.
-  - Exposes detailed breakdowns for Finance dashboard and CSV export.
+    -   **Super Admin**
+        -   Manage tenants (create, update, delete).
+        -   Manage subscription plans.
+        -   View and manage platform-level users.
+    -   **Company Admin**
+        -   Manage employees, departments, and roles.
+        -   Configure leave and attendance policies.
+    -   **HR Manager**
+        -   Manage employees and leave requests.
+        -   View and manage attendance logs.
+    -   **Finance Manager**
+        -   Run monthly payroll for all active employees.
+        -   Manage payroll adjustments and view audit reports.
+    -   **Department Manager**
+        -   View department team, leave requests, attendance summaries.
+        -   Submit and manage performance reviews.
+    -   **Employee**
+        -   Submit leave requests.
+        -   View payslips.
+        -   Check in / check out attendance with optional biometric and visual confirmation.
 
-- **Performance Reviews**
-  - Department Manager reviews with KPI summaries and star ratings.
-  - Detailed review modal with structured feedback and rating breakdown.
+-   **Attendance & Leave Management**
 
-- **Modern Frontend**
-  - React + Inertia.js SPA-style UX.
-  - Tailwind CSS for UI styling.
-  - Reusable pagination and search components for large table-based views.
+    -   Attendance policies: work times, grace periods, Wi-Fi restrictions, biometric/visual confirmation requirements.
+    -   Leave policies: leave types, annual entitlements, paid/unpaid, approval requirements.
+    -   Attendance logs with metadata including IP, Wi-Fi verification, and biometric/visual checks.
+
+-   **Payroll Engine**
+
+    -   Monthly payroll runs per tenant.
+    -   Processes all active employees with gross pay, adjustments, deductions, and tax.
+    -   Exposes detailed breakdowns for Finance dashboard and CSV export.
+
+-   **Performance Reviews**
+
+    -   Department Manager reviews with KPI summaries and star ratings.
+    -   Detailed review modal with structured feedback and rating breakdown.
+
+-   **Modern Frontend**
+    -   React + Inertia.js SPA-style UX.
+    -   Tailwind CSS for UI styling.
+    -   Reusable pagination and search components for large table-based views.
 
 ---
 
 ## Architecture & Tech Stack
 
-- **Backend**
-  - Laravel 12 (PHP ^8.2)
-  - Inertia.js Laravel adapter
-  - Sanctum for auth/session handling
-  - Multi-database configuration (`config/database.php`) with a central connection and a dynamic `Tenant` connection.
+-   **Backend**
 
-- **Frontend**
-  - React 18
-  - Inertia.js React adapter
-  - Vite 6 for bundling and dev server
-  - Tailwind CSS 3
-  - UI libraries: Headless UI, Heroicons, Lucide, React Icons, Framer Motion (for animations)
+    -   Laravel 12 (PHP ^8.2)
+    -   Inertia.js Laravel adapter
+    -   Sanctum for auth/session handling
+    -   Multi-database configuration (`config/database.php`) with a central connection and a dynamic `Tenant` connection.
 
-- **Other Components**
-  - Database migrations under `database/migrations` and `database/migrations/tenant` for central and tenant schemas.
-  - Role-based routing and middleware in `routes/web.php` and `app/Http/Middleware`.
-  - Queue workers (optional) via Laravel's queue system.
+-   **Frontend**
+
+    -   React 18
+    -   Inertia.js React adapter
+    -   Vite 6 for bundling and dev server
+    -   Tailwind CSS 3
+    -   UI libraries: Headless UI, Heroicons, Lucide, React Icons, Framer Motion (for animations)
+
+-   **Other Components**
+    -   Database migrations under `database/migrations` and `database/migrations/tenant` for central and tenant schemas.
+    -   Role-based routing and middleware in `routes/web.php` and `app/Http/Middleware`.
+    -   Queue workers (optional) via Laravel's queue system.
 
 ---
 
@@ -113,42 +119,42 @@ The platform is suitable for production SaaS deployments and can be hosted on se
 
 Responsible for platform configuration and management:
 
-- Manages tenants and their lifecycle.
-- Configures subscription plans.
-- Manages platform-level users.
+-   Manages tenants and their lifecycle.
+-   Configures subscription plans.
+-   Manages platform-level users.
 
 ### Company Admin
 
 Manages tenant-level configuration:
 
-- Employee records.
-- Departments and department managers.
-- Leave and attendance policies.
-- Role-based access control within the tenant.
+-   Employee records.
+-   Departments and department managers.
+-   Leave and attendance policies.
+-   Role-based access control within the tenant.
 
 ### HR Manager
 
-- Employee onboarding/offboarding.
-- Leave requests approval/rejection.
-- Attendance log overview and corrections (where permitted).
+-   Employee onboarding/offboarding.
+-   Leave requests approval/rejection.
+-   Attendance log overview and corrections (where permitted).
 
 ### Finance Manager
 
-- Monthly payroll generation across all active employees.
-- Manages payroll adjustments and deductions.
-- Reviews audit reports and can export CSV for finance systems.
+-   Monthly payroll generation across all active employees.
+-   Manages payroll adjustments and deductions.
+-   Reviews audit reports and can export CSV for finance systems.
 
 ### Department Manager
 
-- Views team members scoped to their department.
-- Reviews team attendance and leave requests.
-- Submits performance reviews with KPI scoring and star ratings.
+-   Views team members scoped to their department.
+-   Reviews team attendance and leave requests.
+-   Submits performance reviews with KPI scoring and star ratings.
 
 ### Employee
 
-- Checks in/out attendance.
-- Requests leave and views leave status.
-- Views payslips and payroll details.
+-   Checks in/out attendance.
+-   Requests leave and views leave status.
+-   Views payslips and payroll details.
 
 ---
 
@@ -156,10 +162,10 @@ Manages tenant-level configuration:
 
 ### Prerequisites
 
-- PHP ^8.2
-- Composer
-- Node.js (LTS) and npm
-- MySQL / MariaDB
+-   PHP ^8.2
+-   Composer
+-   Node.js (LTS) and npm
+-   MySQL / MariaDB
 
 ### 1. Clone the Repository
 
@@ -238,13 +244,13 @@ Then visit the host/port shown in the terminal (usually `http://127.0.0.1:8000`)
 
 The project's `config/database.php` defines:
 
-- A default connection (usually MySQL in production).
-- A dynamic `Tenant` connection using the same host/port/credentials as the central DB, but with the database name set at runtime per tenant.
+-   A default connection (usually MySQL in production).
+-   A dynamic `Tenant` connection using the same host/port/credentials as the central DB, but with the database name set at runtime per tenant.
 
 Tenant selection and DB switching is handled by middleware such as `SwitchTenantDatabase`, which:
 
-- Identifies the current tenant from the authenticated user/session.
-- Switches the `Tenant` connection to the appropriate database.
+-   Identifies the current tenant from the authenticated user/session.
+-   Switches the `Tenant` connection to the appropriate database.
 
 All tenant-scoped models and controllers use the `Tenant` connection for data isolation.
 
@@ -260,8 +266,8 @@ composer test
 
 You can write feature and unit tests under the `tests/` directory. Ensure that any tests that rely on tenant data either:
 
-- Use an in-memory / ephemeral database, or
-- Create and migrate tenant databases as part of the test setup.
+-   Use an in-memory / ephemeral database, or
+-   Create and migrate tenant databases as part of the test setup.
 
 ---
 
@@ -273,8 +279,8 @@ Alpha HRMS can be deployed to **Railway** or any similar platform that supports 
 
 Ensure the following extensions are enabled (for example via `RAILPACK_PHP_EXTENSIONS` or similar env):
 
-- `pdo_mysql`
-- `mysqli`
+-   `pdo_mysql`
+-   `mysqli`
 
 ### Database Configuration (MySQL)
 
@@ -302,12 +308,8 @@ After updating environment variables, **redeploy** the service to apply changes.
 
 ## Security & Best Practices
 
-- Never commit real `.env` files or secrets.
-- Use HTTPS in production and configure trusted proxies if behind a load balancer.
-- Keep dependencies up to date (both Composer and npm).
-- Regularly back up both central and tenant databases.
-- Restrict direct database access to trusted hosts/networks.
-
----
-
-
+-   Never commit real `.env` files or secrets.
+-   Use HTTPS in production and configure trusted proxies if behind a load balancer.
+-   Keep dependencies up to date (both Composer and npm).
+-   Regularly back up both central and tenant databases.
+-   Restrict direct database access to trusted hosts/networks.
