@@ -2,7 +2,9 @@ import { Head } from '@inertiajs/inertia-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { FiChevronDown, FiLogOut, FiUser, FiUsers, FiClock, FiCheck, FiX, FiPlus } from 'react-icons/fi';
+import { FaRegStar, FaStar } from 'react-icons/fa';
 import Modal from '@/Components/Modal';
+import PaginationControls from '../../Components/PaginationControls';
 
 export default function DepartmentManagerDashboard({ user, tenant_db }) {
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -14,9 +16,21 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
     const [warning, setWarning] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [teamPage, setTeamPage] = useState(1);
+    const [teamPageSize, setTeamPageSize] = useState(10);
+    const [leavePage, setLeavePage] = useState(1);
+    const [leavePageSize, setLeavePageSize] = useState(10);
+    const [attendancePage, setAttendancePage] = useState(1);
+    const [attendancePageSize, setAttendancePageSize] = useState(10);
+    const [reviewsPage, setReviewsPage] = useState(1);
+    const [reviewsPageSize, setReviewsPageSize] = useState(10);
+
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
     const [selectedLeaveId, setSelectedLeaveId] = useState(null);
+
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [selectedReview, setSelectedReview] = useState(null);
 
     const [department, setDepartment] = useState(null);
     const [employees, setEmployees] = useState([]);
@@ -32,11 +46,93 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
         employee_id: '',
         period_start: startOfMonth.toISOString().slice(0, 10),
         period_end: now.toISOString().slice(0, 10),
-        rating: '3',
+        rating: 3,
         strengths: '',
         improvements: '',
         goals: '',
     });
+
+    const StarRating = ({ value, onChange, disabled = false }) => {
+        const [hover, setHover] = useState(null);
+        const shown = hover ?? value;
+
+        return (
+            <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => {
+                        const active = Number(shown) >= n;
+                        const Icon = active ? FaStar : FaRegStar;
+                        return (
+                            <button
+                                key={n}
+                                type="button"
+                                disabled={disabled}
+                                onMouseEnter={() => !disabled && setHover(n)}
+                                onMouseLeave={() => !disabled && setHover(null)}
+                                onClick={() => !disabled && onChange?.(n)}
+                                className={`p-1 rounded ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800'} ${active ? 'text-amber-500' : 'text-gray-300 dark:text-gray-600'}`}
+                                aria-label={`Rate ${n} star${n === 1 ? '' : 's'}`}
+                            >
+                                <Icon className="h-5 w-5" />
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {Number(value) ? `(${value}/5)` : '(No rating)'}
+                </div>
+            </div>
+        );
+    };
+
+    const reviewStats = useMemo(() => {
+        const list = Array.isArray(reviews) ? reviews : [];
+        const ratings = list.map((r) => Number(r?.rating)).filter((n) => Number.isFinite(n) && n > 0);
+        const avg = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : 0;
+
+        const nowLocal = new Date();
+        const since30 = new Date(nowLocal);
+        since30.setDate(since30.getDate() - 30);
+        const monthStart = new Date(nowLocal.getFullYear(), nowLocal.getMonth(), 1);
+
+        const count30 = list.filter((r) => {
+            const v = r?.submitted_at;
+            if (!v) return false;
+            const d = new Date(v);
+            return !Number.isNaN(d.getTime()) && d >= since30;
+        }).length;
+
+        const countMonth = list.filter((r) => {
+            const v = r?.submitted_at;
+            if (!v) return false;
+            const d = new Date(v);
+            return !Number.isNaN(d.getTime()) && d >= monthStart;
+        }).length;
+
+        return {
+            total: list.length,
+            avg,
+            count30,
+            countMonth,
+        };
+    }, [reviews]);
+
+    const openReviewModal = (review) => {
+        setSelectedReview(review);
+        setReviewModalOpen(true);
+    };
+
+    const renderStars = (value) => {
+        const v = Number(value) || 0;
+        return (
+            <div className="inline-flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => {
+                    const Icon = v >= n ? FaStar : FaRegStar;
+                    return <Icon key={n} className={`${v >= n ? 'text-amber-500' : 'text-gray-300 dark:text-gray-600'} h-4 w-4`} />;
+                })}
+            </div>
+        );
+    };
 
     const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -57,15 +153,34 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
         }
     };
 
+    const appBasePath = () => {
+        const raw = document.querySelector('meta[name="app-base-url"]')?.getAttribute('content');
+        if (!raw) return '';
+        try {
+            const u = new URL(raw, window.location.origin);
+            const p = (u.pathname || '/').replace(/\/+$/, '');
+            return p === '/' ? '' : p;
+        } catch {
+            return '';
+        }
+    };
+
+    const applyBasePath = (path) => {
+        const base = appBasePath();
+        if (!base) return path;
+        if (path === base || path.startsWith(`${base}/`)) return path;
+        return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+    };
+
     const normalizeSameOriginUrl = (url) => {
         try {
             const u = new URL(url, window.location.href);
             if (u.origin !== window.location.origin) {
-                return `${u.pathname}${u.search}${u.hash}`;
+                return applyBasePath(`${u.pathname}${u.search}${u.hash}`);
             }
-            return `${u.pathname}${u.search}${u.hash}`;
+            return applyBasePath(`${u.pathname}${u.search}${u.hash}`);
         } catch {
-            return url;
+            return applyBasePath(url);
         }
     };
 
@@ -149,6 +264,14 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
         });
     }, [employees, searchTerm]);
 
+    const pagedEmployees = useMemo(() => {
+        const size = Number(teamPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredEmployees.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(teamPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredEmployees.slice(start, start + size);
+    }, [filteredEmployees, teamPage, teamPageSize]);
+
     const filteredLeaveRequests = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
         if (!q) return leaveRequests || [];
@@ -160,6 +283,14 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
         });
     }, [leaveRequests, searchTerm]);
 
+    const pagedLeaveRequests = useMemo(() => {
+        const size = Number(leavePageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredLeaveRequests.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(leavePage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredLeaveRequests.slice(start, start + size);
+    }, [filteredLeaveRequests, leavePage, leavePageSize]);
+
     const filteredReviews = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
         if (!q) return reviews || [];
@@ -169,6 +300,23 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
             return `${name} ${period} ${r?.rating ?? ''}`.toLowerCase().includes(q);
         });
     }, [reviews, searchTerm]);
+
+    const pagedReviews = useMemo(() => {
+        const size = Number(reviewsPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredReviews.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(reviewsPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredReviews.slice(start, start + size);
+    }, [filteredReviews, reviewsPage, reviewsPageSize]);
+
+    const pagedAttendanceSummary = useMemo(() => {
+        const list = Array.isArray(attendance?.summary) ? attendance.summary : [];
+        const size = Number(attendancePageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((list.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(attendancePage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return list.slice(start, start + size);
+    }, [attendance?.summary, attendancePage, attendancePageSize]);
 
     const loadTeam = async () => {
         const data = await fetchJson(route('tenant.manager.team.overview'));
@@ -298,6 +446,80 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                 </form>
             </Modal>
 
+            <Modal
+                show={reviewModalOpen}
+                onClose={() => {
+                    setReviewModalOpen(false);
+                    setSelectedReview(null);
+                }}
+            >
+                <div className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Review Details</h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {selectedReview?.employee?.user?.name || `Employee #${selectedReview?.employee_id || '-'}`}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setReviewModalOpen(false);
+                                setSelectedReview(null);
+                            }}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                        >
+                            <FiX />
+                        </button>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Period</div>
+                            <div className="font-medium mt-1">
+                                {selectedReview?.period_start || '-'} → {selectedReview?.period_end || '-'}
+                            </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Rating</div>
+                            <div className="mt-1 flex items-center gap-2">
+                                {renderStars(selectedReview?.rating)}
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                    {selectedReview?.rating ? `${selectedReview.rating}/5` : '-'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Submitted</div>
+                            <div className="font-medium mt-1">
+                                {selectedReview?.submitted_at ? new Date(selectedReview.submitted_at).toLocaleString() : '-'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-1 gap-4">
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">Strengths</div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 whitespace-pre-wrap">
+                                {selectedReview?.strengths || '—'}
+                            </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">Areas to Improve</div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 whitespace-pre-wrap">
+                                {selectedReview?.improvements || '—'}
+                            </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">Goals</div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 whitespace-pre-wrap">
+                                {selectedReview?.goals || '—'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
             <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
@@ -373,7 +595,13 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                     <div className="flex-1 min-w-[240px]">
                         <input
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setTeamPage(1);
+                                setLeavePage(1);
+                                setAttendancePage(1);
+                                setReviewsPage(1);
+                            }}
                             className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
                             placeholder="Search team, leave, reviews..."
                         />
@@ -466,6 +694,15 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                     <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                                         <h3 className="text-lg font-semibold">Team Members</h3>
                                     </div>
+                                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                        <PaginationControls
+                                            page={teamPage}
+                                            pageSize={teamPageSize}
+                                            total={filteredEmployees.length}
+                                            onPageChange={(p) => setTeamPage(p)}
+                                            onPageSizeChange={(n) => { setTeamPageSize(n); setTeamPage(1); }}
+                                        />
+                                    </div>
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full">
                                             <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -477,7 +714,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {filteredEmployees.map((e) => (
+                                                {pagedEmployees.map((e) => (
                                                     <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                         <td className="px-6 py-4 text-sm font-medium">{e?.user?.name}</td>
                                                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{e?.user?.email}</td>
@@ -485,7 +722,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                         <td className="px-6 py-4 text-sm">{e?.status || '-'}</td>
                                                     </tr>
                                                 ))}
-                                                {filteredEmployees.length === 0 && (
+                                                {pagedEmployees.length === 0 && (
                                                     <tr>
                                                         <td colSpan="4" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No team members found.</td>
                                                     </tr>
@@ -506,6 +743,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                             onChange={async (e) => {
                                                 const v = e.target.value;
                                                 setLeaveStatusFilter(v);
+                                                setLeavePage(1);
                                                 setLoading(true);
                                                 setError('');
                                                 try {
@@ -537,7 +775,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {filteredLeaveRequests.map((r) => (
+                                                {pagedLeaveRequests.map((r) => (
                                                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                         <td className="px-6 py-4 text-sm font-medium">{r?.employee?.user?.name}</td>
                                                         <td className="px-6 py-4 text-sm">{r?.leave_type}</td>
@@ -569,7 +807,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                         </td>
                                                     </tr>
                                                 ))}
-                                                {filteredLeaveRequests.length === 0 && (
+                                                {pagedLeaveRequests.length === 0 && (
                                                     <tr>
                                                         <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No leave requests found.</td>
                                                     </tr>
@@ -615,6 +853,15 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                     <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                                         <h3 className="text-lg font-semibold">By Employee</h3>
                                     </div>
+                                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                        <PaginationControls
+                                            page={attendancePage}
+                                            pageSize={attendancePageSize}
+                                            total={(attendance?.summary || []).length}
+                                            onPageChange={(p) => setAttendancePage(p)}
+                                            onPageSizeChange={(n) => { setAttendancePageSize(n); setAttendancePage(1); }}
+                                        />
+                                    </div>
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full">
                                             <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -626,7 +873,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {(attendance?.summary || []).map((s) => (
+                                                {pagedAttendanceSummary.map((s) => (
                                                     <tr key={s.employee_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                         <td className="px-6 py-4 text-sm font-medium">{s.name || `Employee #${s.employee_id}`}</td>
                                                         <td className="px-6 py-4 text-sm">{s.check_ins}</td>
@@ -634,7 +881,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{s.last_seen ? new Date(s.last_seen).toLocaleString() : '-'}</td>
                                                     </tr>
                                                 ))}
-                                                {(attendance?.summary || []).length === 0 && (
+                                                {pagedAttendanceSummary.length === 0 && (
                                                     <tr>
                                                         <td colSpan="4" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No attendance logs found for this period.</td>
                                                     </tr>
@@ -648,6 +895,26 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
 
                         {activeTab === 'reviews' && (
                             <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                                        <div className="text-white/80 text-sm">Total Reviews</div>
+                                        <div className="text-3xl font-bold mt-1">{reviewStats.total}</div>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-6 text-white">
+                                        <div className="text-white/80 text-sm">Average Rating</div>
+                                        <div className="text-3xl font-bold mt-1">{reviewStats.avg ? reviewStats.avg.toFixed(1) : '0.0'}</div>
+                                        <div className="mt-2">{renderStars(Math.round(reviewStats.avg || 0))}</div>
+                                    </div>
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">Last 30 Days</div>
+                                        <div className="text-3xl font-bold mt-1">{reviewStats.count30}</div>
+                                    </div>
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">This Month</div>
+                                        <div className="text-3xl font-bold mt-1">{reviewStats.countMonth}</div>
+                                    </div>
+                                </div>
+
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                     <h3 className="text-lg font-semibold">Submit Performance Review</h3>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create a review for an employee in your department.</p>
@@ -689,17 +956,11 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Rating</label>
-                                            <select
-                                                value={reviewForm.rating}
-                                                onChange={(e) => setReviewForm((p) => ({ ...p, rating: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
-                                            >
-                                                <option value="1">1</option>
-                                                <option value="2">2</option>
-                                                <option value="3">3</option>
-                                                <option value="4">4</option>
-                                                <option value="5">5</option>
-                                            </select>
+                                            <StarRating
+                                                value={Number(reviewForm.rating) || 0}
+                                                onChange={(v) => setReviewForm((p) => ({ ...p, rating: v }))}
+                                                disabled={loading}
+                                            />
                                         </div>
                                         <div className="md:col-span-6">
                                             <label className="block text-sm font-medium mb-1">Strengths</label>
@@ -743,6 +1004,15 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                     <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                                         <h3 className="text-lg font-semibold">Submitted Reviews</h3>
                                     </div>
+                                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                        <PaginationControls
+                                            page={reviewsPage}
+                                            pageSize={reviewsPageSize}
+                                            total={filteredReviews.length}
+                                            onPageChange={(p) => setReviewsPage(p)}
+                                            onPageSizeChange={(n) => { setReviewsPageSize(n); setReviewsPage(1); }}
+                                        />
+                                    </div>
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full">
                                             <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -751,20 +1021,35 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Period</th>
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Rating</th>
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Submitted</th>
+                                                    <th className="text-right px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {filteredReviews.map((r) => (
+                                                {pagedReviews.map((r) => (
                                                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                         <td className="px-6 py-4 text-sm font-medium">{r?.employee?.user?.name || `Employee #${r.employee_id}`}</td>
                                                         <td className="px-6 py-4 text-sm">{r?.period_start} → {r?.period_end}</td>
-                                                        <td className="px-6 py-4 text-sm">{r?.rating ?? '-'}</td>
+                                                        <td className="px-6 py-4 text-sm">
+                                                            <div className="flex items-center gap-2">
+                                                                {renderStars(r?.rating)}
+                                                                <span className="text-xs text-gray-500 dark:text-gray-400">{r?.rating ? `${r.rating}/5` : '-'}</span>
+                                                            </div>
+                                                        </td>
                                                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{r?.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-'}</td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openReviewModal(r)}
+                                                                className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                                                            >
+                                                                View
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
-                                                {filteredReviews.length === 0 && (
+                                                {pagedReviews.length === 0 && (
                                                     <tr>
-                                                        <td colSpan="4" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No reviews submitted yet.</td>
+                                                        <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No reviews submitted yet.</td>
                                                     </tr>
                                                 )}
                                             </tbody>

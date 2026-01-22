@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 import { usePage } from '@inertiajs/inertia-react';
 import { FiUsers, FiBriefcase, FiCalendar, FiClock, FiShield, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX, FiCheck, FiSearch, FiEdit, FiTrash2, FiMoreVertical } from 'react-icons/fi';
+import PaginationControls from '../../Components/PaginationControls';
 
 export default function CompanyAdminDashboard({ employees = [], departments = [], leavePolicies = [], attendancePolicies = [], roles = [], permissions = [], stats }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -16,12 +17,123 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     const [wifiDetectLoading, setWifiDetectLoading] = useState(false);
     const [wifiDetectError, setWifiDetectError] = useState('');
 
+    const [employeesPage, setEmployeesPage] = useState(1);
+    const [employeesPageSize, setEmployeesPageSize] = useState(10);
+
+    const [departmentsPage, setDepartmentsPage] = useState(1);
+    const [departmentsPageSize, setDepartmentsPageSize] = useState(10);
+
+    const [leavePoliciesPage, setLeavePoliciesPage] = useState(1);
+    const [leavePoliciesPageSize, setLeavePoliciesPageSize] = useState(10);
+
+    const [attendancePoliciesPage, setAttendancePoliciesPage] = useState(1);
+    const [attendancePoliciesPageSize, setAttendancePoliciesPageSize] = useState(10);
+
+    const [rolesPage, setRolesPage] = useState(1);
+    const [rolesPageSize, setRolesPageSize] = useState(10);
+
     const { auth } = usePage().props;
     const user = auth?.user || {};
 
     const getInitials = (name) => {
         return name?.split(' ').map(part => part[0]).join('').toUpperCase().substring(0, 2) || 'U';
     };
+
+    const filteredEmployees = useMemo(() => {
+        const q = (searchTerm || '').trim().toLowerCase();
+        if (!q) return employees || [];
+        return (employees || []).filter((e) => {
+            const name = e?.user?.name || '';
+            const email = e?.user?.email || '';
+            const code = e?.employee_code || '';
+            const title = e?.job_title || '';
+            const dept = e?.department?.name || '';
+            return `${name} ${email} ${code} ${title} ${dept}`.toLowerCase().includes(q);
+        });
+    }, [employees, searchTerm]);
+
+    const pagedEmployees = useMemo(() => {
+        const size = Number(employeesPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredEmployees.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(employeesPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredEmployees.slice(start, start + size);
+    }, [filteredEmployees, employeesPage, employeesPageSize]);
+
+    const filteredDepartments = useMemo(() => {
+        const q = (searchTerm || '').trim().toLowerCase();
+        if (!q) return departments || [];
+        return (departments || []).filter((d) => {
+            const name = d?.name || '';
+            const manager = d?.manager?.name || '';
+            const desc = d?.description || '';
+            return `${name} ${manager} ${desc}`.toLowerCase().includes(q);
+        });
+    }, [departments, searchTerm]);
+
+    const pagedDepartments = useMemo(() => {
+        const size = Number(departmentsPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredDepartments.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(departmentsPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredDepartments.slice(start, start + size);
+    }, [filteredDepartments, departmentsPage, departmentsPageSize]);
+
+    const filteredLeavePolicies = useMemo(() => {
+        const q = (searchTerm || '').trim().toLowerCase();
+        if (!q) return leavePolicies || [];
+        return (leavePolicies || []).filter((p) => {
+            const name = p?.policy_name || '';
+            const type = p?.leave_type || '';
+            const desc = p?.description || '';
+            return `${name} ${type} ${desc}`.toLowerCase().includes(q);
+        });
+    }, [leavePolicies, searchTerm]);
+
+    const pagedLeavePolicies = useMemo(() => {
+        const size = Number(leavePoliciesPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredLeavePolicies.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(leavePoliciesPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredLeavePolicies.slice(start, start + size);
+    }, [filteredLeavePolicies, leavePoliciesPage, leavePoliciesPageSize]);
+
+    const filteredAttendancePolicies = useMemo(() => {
+        const q = (searchTerm || '').trim().toLowerCase();
+        if (!q) return attendancePolicies || [];
+        return (attendancePolicies || []).filter((p) => {
+            const name = p?.policy_name || '';
+            const hours = `${p?.work_start_time || ''} ${p?.work_end_time || ''}`;
+            return `${name} ${hours}`.toLowerCase().includes(q);
+        });
+    }, [attendancePolicies, searchTerm]);
+
+    const pagedAttendancePolicies = useMemo(() => {
+        const size = Number(attendancePoliciesPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredAttendancePolicies.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(attendancePoliciesPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredAttendancePolicies.slice(start, start + size);
+    }, [filteredAttendancePolicies, attendancePoliciesPage, attendancePoliciesPageSize]);
+
+    const filteredRoles = useMemo(() => {
+        const q = (searchTerm || '').trim().toLowerCase();
+        if (!q) return roles || [];
+        return (roles || []).filter((r) => {
+            const name = r?.display_name || '';
+            const sys = r?.name || '';
+            const desc = r?.description || '';
+            return `${name} ${sys} ${desc}`.toLowerCase().includes(q);
+        });
+    }, [roles, searchTerm]);
+
+    const pagedRoles = useMemo(() => {
+        const size = Number(rolesPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredRoles.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(rolesPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredRoles.slice(start, start + size);
+    }, [filteredRoles, rolesPage, rolesPageSize]);
 
     // Form States
     const [employeeForm, setEmployeeForm] = useState({
@@ -504,7 +616,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                     <div className="flex items-center space-x-3">
                                         <div className="relative">
                                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                            <input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                                            <input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setEmployeesPage(1); }}
                                                 className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 w-full md:w-64" />
                                         </div>
                                         <button onClick={() => { setEditingItem(null); setEmployeeForm({ name: "", email: "", password: "", role: "employee", department_id: "", hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time" }); setShowEmployeeForm(true); }}
@@ -512,6 +624,15 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             <FiPlus className="mr-2" /> Add Employee
                                         </button>
                                     </div>
+                                </div>
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <PaginationControls
+                                        page={employeesPage}
+                                        pageSize={employeesPageSize}
+                                        total={filteredEmployees.length}
+                                        onPageChange={(p) => setEmployeesPage(p)}
+                                        onPageSizeChange={(n) => { setEmployeesPageSize(n); setEmployeesPage(1); }}
+                                    />
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
@@ -526,7 +647,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {employees?.filter(e => e.user?.name.toLowerCase().includes(searchTerm.toLowerCase())).map((emp) => (
+                                            {pagedEmployees.map((emp) => (
                                                 <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center">
@@ -556,6 +677,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {pagedEmployees.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="6" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No employees found.</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -572,6 +698,26 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         <FiPlus className="mr-2" /> Add Department
                                     </button>
                                 </div>
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="relative w-full lg:max-w-sm">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search departments..."
+                                            value={searchTerm}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setDepartmentsPage(1); }}
+                                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 w-full"
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={departmentsPage}
+                                        pageSize={departmentsPageSize}
+                                        total={filteredDepartments.length}
+                                        onPageChange={(p) => setDepartmentsPage(p)}
+                                        onPageSizeChange={(n) => { setDepartmentsPageSize(n); setDepartmentsPage(1); }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
@@ -583,7 +729,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {departments?.map((dept) => (
+                                            {pagedDepartments.map((dept) => (
                                                 <tr key={dept.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td className="px-6 py-4 font-semibold">{dept.name}</td>
                                                     <td className="px-6 py-4 text-sm">{dept.manager?.name || 'No Manager'}</td>
@@ -594,6 +740,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {pagedDepartments.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="4" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No departments found.</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -610,6 +761,26 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         <FiPlus className="mr-2" /> Add Policy
                                     </button>
                                 </div>
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="relative w-full lg:max-w-sm">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search leave policies..."
+                                            value={searchTerm}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setLeavePoliciesPage(1); }}
+                                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 w-full"
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={leavePoliciesPage}
+                                        pageSize={leavePoliciesPageSize}
+                                        total={filteredLeavePolicies.length}
+                                        onPageChange={(p) => setLeavePoliciesPage(p)}
+                                        onPageSizeChange={(n) => { setLeavePoliciesPageSize(n); setLeavePoliciesPage(1); }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
@@ -622,7 +793,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {leavePolicies?.map((policy) => (
+                                            {pagedLeavePolicies.map((policy) => (
                                                 <tr key={policy.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td className="px-6 py-4 font-semibold">{policy.policy_name}</td>
                                                     <td className="px-6 py-4 capitalize">{policy.leave_type}</td>
@@ -638,6 +809,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {pagedLeavePolicies.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No leave policies found.</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -654,6 +830,26 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         <FiPlus className="mr-2" /> Add Policy
                                     </button>
                                 </div>
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="relative w-full lg:max-w-sm">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search attendance policies..."
+                                            value={searchTerm}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setAttendancePoliciesPage(1); }}
+                                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 w-full"
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={attendancePoliciesPage}
+                                        pageSize={attendancePoliciesPageSize}
+                                        total={filteredAttendancePolicies.length}
+                                        onPageChange={(p) => setAttendancePoliciesPage(p)}
+                                        onPageSizeChange={(n) => { setAttendancePoliciesPageSize(n); setAttendancePoliciesPage(1); }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
@@ -666,7 +862,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {attendancePolicies?.map((policy) => (
+                                            {pagedAttendancePolicies.map((policy) => (
                                                 <tr key={policy.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td className="px-6 py-4 font-semibold">{policy.policy_name}</td>
                                                     <td className="px-6 py-4 text-sm">{policy.work_start_time} - {policy.work_end_time}</td>
@@ -678,6 +874,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {pagedAttendancePolicies.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No attendance policies found.</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -694,6 +895,26 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         <FiPlus className="mr-2" /> Add Role
                                     </button>
                                 </div>
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="relative w-full lg:max-w-sm">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search roles..."
+                                            value={searchTerm}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setRolesPage(1); }}
+                                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 w-full"
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={rolesPage}
+                                        pageSize={rolesPageSize}
+                                        total={filteredRoles.length}
+                                        onPageChange={(p) => setRolesPage(p)}
+                                        onPageSizeChange={(n) => { setRolesPageSize(n); setRolesPage(1); }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500">
@@ -705,7 +926,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {roles?.map((role) => (
+                                            {pagedRoles.map((role) => (
                                                 <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td className="px-6 py-4 font-semibold">{role.display_name}</td>
                                                     <td className="px-6 py-4">
@@ -720,6 +941,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {pagedRoles.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="4" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">No roles found.</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>

@@ -2,6 +2,7 @@ import { Head, usePage } from '@inertiajs/inertia-react';
 import React, { useMemo, useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { FiUsers, FiCalendar, FiClock, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX, FiSearch, FiCheck } from 'react-icons/fi';
+import PaginationControls from '../../Components/PaginationControls';
 
 export default function HrDashboard({ employees = [], departments = [], leaveRequests = [], attendanceLogs = [] }) {
     const { auth } = usePage().props;
@@ -13,6 +14,13 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
     const [selectedLeaveId, setSelectedLeaveId] = useState(null);
+
+    const [employeesPage, setEmployeesPage] = useState(1);
+    const [employeesPageSize, setEmployeesPageSize] = useState(10);
+    const [leavePage, setLeavePage] = useState(1);
+    const [leavePageSize, setLeavePageSize] = useState(10);
+    const [attendancePage, setAttendancePage] = useState(1);
+    const [attendancePageSize, setAttendancePageSize] = useState(10);
 
     const [hireForm, setHireForm] = useState({
         name: '',
@@ -39,6 +47,14 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
         });
     }, [employees, searchTerm]);
 
+    const pagedEmployees = useMemo(() => {
+        const size = Number(employeesPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredEmployees.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(employeesPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredEmployees.slice(start, start + size);
+    }, [filteredEmployees, employeesPage, employeesPageSize]);
+
     const filteredLeaveRequests = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
         if (!q) return leaveRequests;
@@ -51,6 +67,14 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
         });
     }, [leaveRequests, searchTerm]);
 
+    const pagedLeaveRequests = useMemo(() => {
+        const size = Number(leavePageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredLeaveRequests.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(leavePage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredLeaveRequests.slice(start, start + size);
+    }, [filteredLeaveRequests, leavePage, leavePageSize]);
+
     const filteredAttendanceLogs = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
         if (!q) return attendanceLogs;
@@ -61,6 +85,14 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
             return `${name} ${email} ${type}`.toLowerCase().includes(q);
         });
     }, [attendanceLogs, searchTerm]);
+
+    const pagedAttendanceLogs = useMemo(() => {
+        const size = Number(attendancePageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredAttendanceLogs.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(attendancePage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredAttendanceLogs.slice(start, start + size);
+    }, [filteredAttendanceLogs, attendancePage, attendancePageSize]);
 
     const submitHire = (e) => {
         e.preventDefault();
@@ -258,7 +290,12 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                         <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input
                                             value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            onChange={(e) => {
+                                                setSearchTerm(e.target.value);
+                                                setEmployeesPage(1);
+                                                setLeavePage(1);
+                                                setAttendancePage(1);
+                                            }}
                                             placeholder="Search employees, leave requests, attendance..."
                                             className="w-full pl-10 pr-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
@@ -286,6 +323,16 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Hire new employees and offboard staff.</p>
                                 </div>
 
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <PaginationControls
+                                        page={employeesPage}
+                                        pageSize={employeesPageSize}
+                                        total={filteredEmployees.length}
+                                        onPageChange={(p) => setEmployeesPage(p)}
+                                        onPageSizeChange={(n) => { setEmployeesPageSize(n); setEmployeesPage(1); }}
+                                    />
+                                </div>
+
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full">
                                         <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -298,7 +345,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {filteredEmployees.map((emp) => (
+                                            {pagedEmployees.map((emp) => (
                                                 <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center space-x-3">
@@ -337,7 +384,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {filteredEmployees.length === 0 && (
+                                            {pagedEmployees.length === 0 && (
                                                 <tr>
                                                     <td className="px-6 py-10 text-center text-gray-500 dark:text-gray-400" colSpan="5">No employees found.</td>
                                                 </tr>
@@ -355,6 +402,16 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Approve or reject employee leave requests.</p>
                                 </div>
 
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <PaginationControls
+                                        page={leavePage}
+                                        pageSize={leavePageSize}
+                                        total={filteredLeaveRequests.length}
+                                        onPageChange={(p) => setLeavePage(p)}
+                                        onPageSizeChange={(n) => { setLeavePageSize(n); setLeavePage(1); }}
+                                    />
+                                </div>
+
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full">
                                         <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -367,7 +424,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {filteredLeaveRequests.map((req) => (
+                                            {pagedLeaveRequests.map((req) => (
                                                 <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="font-medium">{req?.employee?.user?.name}</div>
@@ -410,7 +467,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {filteredLeaveRequests.length === 0 && (
+                                            {pagedLeaveRequests.length === 0 && (
                                                 <tr>
                                                     <td className="px-6 py-10 text-center text-gray-500 dark:text-gray-400" colSpan="5">No leave requests found.</td>
                                                 </tr>
@@ -428,6 +485,16 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Latest check-ins and check-outs.</p>
                                 </div>
 
+                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                    <PaginationControls
+                                        page={attendancePage}
+                                        pageSize={attendancePageSize}
+                                        total={filteredAttendanceLogs.length}
+                                        onPageChange={(p) => setAttendancePage(p)}
+                                        onPageSizeChange={(n) => { setAttendancePageSize(n); setAttendancePage(1); }}
+                                    />
+                                </div>
+
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full">
                                         <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -441,7 +508,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {filteredAttendanceLogs.map((log) => (
+                                            {pagedAttendanceLogs.map((log) => (
                                                 <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="font-medium">{log?.employee?.user?.name}</div>
@@ -454,7 +521,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                                     <td className="px-6 py-4 text-sm">{log.fingerprint_verified ? 'Yes' : 'No'}</td>
                                                 </tr>
                                             ))}
-                                            {filteredAttendanceLogs.length === 0 && (
+                                            {pagedAttendanceLogs.length === 0 && (
                                                 <tr>
                                                     <td className="px-6 py-10 text-center text-gray-500 dark:text-gray-400" colSpan="6">No attendance logs found.</td>
                                                 </tr>

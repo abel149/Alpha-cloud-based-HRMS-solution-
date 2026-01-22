@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 
 import { FiUsers, FiFileText, FiCreditCard, FiPlus, FiChevronRight, FiLogOut, FiUser, FiSettings, FiChevronDown, FiX, FiLayout, FiDollarSign } from 'react-icons/fi';
+import PaginationControls from '../../../Components/PaginationControls';
 
 export default function Dashboard({ auth, tenants, paidApplications, subscriptionPlans, users = [] }) {
     // Persist selected tab so redirects/reloads keep the same section open
@@ -23,6 +24,22 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
     const [showTenantForm, setShowTenantForm] = useState(false);
     const [showPlanForm, setShowPlanForm] = useState(false);
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+
+    const [tenantsQuery, setTenantsQuery] = useState('');
+    const [tenantsPage, setTenantsPage] = useState(1);
+    const [tenantsPageSize, setTenantsPageSize] = useState(10);
+
+    const [paidAppsQuery, setPaidAppsQuery] = useState('');
+    const [paidAppsPage, setPaidAppsPage] = useState(1);
+    const [paidAppsPageSize, setPaidAppsPageSize] = useState(10);
+
+    const [plansQuery, setPlansQuery] = useState('');
+    const [plansPage, setPlansPage] = useState(1);
+    const [plansPageSize, setPlansPageSize] = useState(6);
+
+    const [usersQuery, setUsersQuery] = useState('');
+    const [usersPage, setUsersPage] = useState(1);
+    const [usersPageSize, setUsersPageSize] = useState(10);
 
     // Get authenticated user data from props
     const user = auth?.user || {};
@@ -205,6 +222,86 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
             // Otherwise keep it visible
             return true;
         });
+
+    const filteredTenants = useMemo(() => {
+        const q = (tenantsQuery || '').trim().toLowerCase();
+        if (!q) return tenants || [];
+        return (tenants || []).filter((t) => {
+            const id = String(t?.id ?? '');
+            const db = String(t?.database ?? '');
+            const sub = String(t?.subscription_id ?? '');
+            const by = String(t?.created_by ?? '');
+            return `${id} ${db} ${sub} ${by}`.toLowerCase().includes(q);
+        });
+    }, [tenants, tenantsQuery]);
+
+    const pagedTenants = useMemo(() => {
+        const size = Number(tenantsPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredTenants.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(tenantsPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredTenants.slice(start, start + size);
+    }, [filteredTenants, tenantsPage, tenantsPageSize]);
+
+    const filteredPaidApps = useMemo(() => {
+        const q = (paidAppsQuery || '').trim().toLowerCase();
+        if (!q) return visiblePaidApplications || [];
+        return (visiblePaidApplications || []).filter((a) => {
+            const company = String(a?.company_name ?? '');
+            const email = String(a?.email ?? '');
+            const plan = String(a?.plan ?? '');
+            const txn = String(a?.transaction_id ?? '');
+            const status = String(a?.payment_status ?? '');
+            return `${company} ${email} ${plan} ${txn} ${status}`.toLowerCase().includes(q);
+        });
+    }, [visiblePaidApplications, paidAppsQuery]);
+
+    const pagedPaidApps = useMemo(() => {
+        const size = Number(paidAppsPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredPaidApps.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(paidAppsPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredPaidApps.slice(start, start + size);
+    }, [filteredPaidApps, paidAppsPage, paidAppsPageSize]);
+
+    const filteredPlans = useMemo(() => {
+        const q = (plansQuery || '').trim().toLowerCase();
+        if (!q) return subscriptionPlans || [];
+        return (subscriptionPlans || []).filter((p) => {
+            const name = String(p?.name ?? '');
+            const id = String(p?.planId ?? '');
+            const price = String(p?.price ?? '');
+            const feats = String(p?.features ?? '');
+            return `${name} ${id} ${price} ${feats}`.toLowerCase().includes(q);
+        });
+    }, [subscriptionPlans, plansQuery]);
+
+    const pagedPlans = useMemo(() => {
+        const size = Number(plansPageSize) || 6;
+        const totalPages = Math.max(1, Math.ceil((filteredPlans.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(plansPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredPlans.slice(start, start + size);
+    }, [filteredPlans, plansPage, plansPageSize]);
+
+    const filteredUsers = useMemo(() => {
+        const q = (usersQuery || '').trim().toLowerCase();
+        if (!q) return users || [];
+        return (users || []).filter((u) => {
+            const name = String(u?.name ?? '');
+            const email = String(u?.email ?? '');
+            const role = String(u?.role ?? '');
+            return `${name} ${email} ${role}`.toLowerCase().includes(q);
+        });
+    }, [users, usersQuery]);
+
+    const pagedUsers = useMemo(() => {
+        const size = Number(usersPageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil((filteredUsers.length || 0) / size));
+        const page = Math.min(Math.max(1, Number(usersPage) || 1), totalPages);
+        const start = (page - 1) * size;
+        return filteredUsers.slice(start, start + size);
+    }, [filteredUsers, usersPage, usersPageSize]);
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
@@ -607,6 +704,30 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="w-full lg:max-w-sm">
+                                        <input
+                                            value={tenantsQuery}
+                                            onChange={(e) => {
+                                                setTenantsQuery(e.target.value);
+                                                setTenantsPage(1);
+                                            }}
+                                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                                            placeholder="Search tenants (id, database, subscription)..."
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={tenantsPage}
+                                        pageSize={tenantsPageSize}
+                                        total={filteredTenants.length}
+                                        onPageChange={(p) => setTenantsPage(p)}
+                                        onPageSizeChange={(n) => {
+                                            setTenantsPageSize(n);
+                                            setTenantsPage(1);
+                                        }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -619,8 +740,8 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {tenants.length > 0 ? (
-                                                tenants.map((tenant) => (
+                                            {pagedTenants.length > 0 ? (
+                                                pagedTenants.map((tenant) => (
                                                     <tr key={tenant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{tenant.id}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-100 font-mono">{tenant.database}</td>
@@ -650,7 +771,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                         <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
                                                             <FiUsers className="h-12 w-12 opacity-30" />
                                                             <p className="text-lg font-medium">No tenants found</p>
-                                                            <p className="text-sm">Get started by creating your first tenant</p>
+                                                            <p className="text-sm">Try adjusting your search.</p>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -670,6 +791,30 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                 <p className="text-gray-600 dark:text-gray-400">View and manage paid applications</p>
                             </div>
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="w-full lg:max-w-sm">
+                                        <input
+                                            value={paidAppsQuery}
+                                            onChange={(e) => {
+                                                setPaidAppsQuery(e.target.value);
+                                                setPaidAppsPage(1);
+                                            }}
+                                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                                            placeholder="Search applications (company, email, plan, txn)..."
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={paidAppsPage}
+                                        pageSize={paidAppsPageSize}
+                                        total={filteredPaidApps.length}
+                                        onPageChange={(p) => setPaidAppsPage(p)}
+                                        onPageSizeChange={(n) => {
+                                            setPaidAppsPageSize(n);
+                                            setPaidAppsPage(1);
+                                        }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -680,11 +825,12 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transaction ID</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {visiblePaidApplications.length > 0 ? (
-                                                visiblePaidApplications.map((app) => (
+                                            {pagedPaidApps.length > 0 ? (
+                                                pagedPaidApps.map((app) => (
                                                     <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{app.company_name}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.email}</td>
@@ -708,9 +854,13 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => startTenantFromApplication(app)}
-                                                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                                                                    disabled={provisioningAppIds.has(app.id)}
+                                                                    className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${provisioningAppIds.has(app.id)
+                                                                        ? 'bg-blue-400 cursor-not-allowed'
+                                                                        : 'bg-blue-600 hover:bg-blue-700'
+                                                                        }`}
                                                                 >
-                                                                    Create Tenant
+                                                                    {provisioningAppIds.has(app.id) ? 'Creating…' : 'Create Tenant'}
                                                                 </button>
                                                             )}
                                                         </td>
@@ -718,11 +868,11 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="6" className="px-6 py-12 text-center">
+                                                    <td colSpan="7" className="px-6 py-12 text-center">
                                                         <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
                                                             <FiFileText className="h-12 w-12 opacity-30" />
                                                             <p className="text-lg font-medium">No paid applications</p>
-                                                            <p className="text-sm">Paid applications will appear here</p>
+                                                            <p className="text-sm">Try adjusting your search.</p>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -751,9 +901,37 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                 </button>
                             </div>
 
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="w-full lg:max-w-sm">
+                                        <input
+                                            value={plansQuery}
+                                            onChange={(e) => {
+                                                setPlansQuery(e.target.value);
+                                                setPlansPage(1);
+                                            }}
+                                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                                            placeholder="Search plans (name, id, features)..."
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={plansPage}
+                                        pageSize={plansPageSize}
+                                        total={filteredPlans.length}
+                                        onPageChange={(p) => setPlansPage(p)}
+                                        onPageSizeChange={(n) => {
+                                            setPlansPageSize(n);
+                                            setPlansPage(1);
+                                        }}
+                                        pageSizeOptions={[3, 6, 9, 12]}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {subscriptionPlans.length > 0 ? (
-                                    subscriptionPlans.map((plan) => (
+                                {pagedPlans.length > 0 ? (
+                                    pagedPlans.map((plan) => (
                                         <div key={plan.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow">
                                             <div className="p-6">
                                                 <div className="flex items-center justify-between mb-4">
@@ -787,7 +965,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                         <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
                                             <FiCreditCard className="h-12 w-12 opacity-30" />
                                             <p className="text-lg font-medium">No subscription plans</p>
-                                            <p className="text-sm">Create your first subscription plan to get started</p>
+                                            <p className="text-sm">Try adjusting your search.</p>
                                         </div>
                                     </div>
                                 )}
@@ -1015,6 +1193,30 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="w-full lg:max-w-sm">
+                                        <input
+                                            value={usersQuery}
+                                            onChange={(e) => {
+                                                setUsersQuery(e.target.value);
+                                                setUsersPage(1);
+                                            }}
+                                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                                            placeholder="Search users (name, email, role)..."
+                                        />
+                                    </div>
+                                    <PaginationControls
+                                        page={usersPage}
+                                        pageSize={usersPageSize}
+                                        total={filteredUsers.length}
+                                        onPageChange={(p) => setUsersPage(p)}
+                                        onPageSizeChange={(n) => {
+                                            setUsersPageSize(n);
+                                            setUsersPage(1);
+                                        }}
+                                        className="w-full lg:w-auto"
+                                    />
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                         <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -1026,8 +1228,8 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {users.length > 0 ? (
-                                                users.map((user) => (
+                                            {pagedUsers.length > 0 ? (
+                                                pagedUsers.map((user) => (
                                                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{user.name}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
@@ -1041,7 +1243,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                         <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
                                                             <FiUsers className="h-12 w-12 opacity-30" />
                                                             <p className="text-lg font-medium">No users found</p>
-                                                            <p className="text-sm">Create your first user to get started</p>
+                                                            <p className="text-sm">Try adjusting your search.</p>
                                                         </div>
                                                     </td>
                                                 </tr>

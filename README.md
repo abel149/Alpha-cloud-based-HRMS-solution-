@@ -310,6 +310,4 @@ After updating environment variables, **redeploy** the service to apply changes.
 
 ---
 
-## License
 
-This project is licensed under the **MIT License** (inherited from the Laravel skeleton), unless you apply a different license for your customized distribution.
