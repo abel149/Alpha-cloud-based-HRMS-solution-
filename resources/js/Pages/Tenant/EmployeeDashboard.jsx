@@ -1,10 +1,11 @@
 import { Head } from '@inertiajs/inertia-react';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import { FiHome, FiChevronDown, FiLogOut, FiUser, FiClock, FiCalendar, FiFileText, FiCheck, FiDownload, FiX } from 'react-icons/fi';
 import VisualConfirmation from '../../Components/VisualConfirmation';
 
 export default function EmployeeDashboard({ user }) {
+    const csrfTokenRef = useRef(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [wifiOnline, setWifiOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
     const [companyWifiVerified, setCompanyWifiVerified] = useState(false);
@@ -34,6 +35,8 @@ export default function EmployeeDashboard({ user }) {
         reason: '',
     });
     const [leaveRequests, setLeaveRequests] = useState([]);
+    const [showAllLeaveRequests, setShowAllLeaveRequests] = useState(false);
+    const [leaveSubmitLoading, setLeaveSubmitLoading] = useState(false);
     const [leaveError, setLeaveError] = useState('');
     const [leaveSuccess, setLeaveSuccess] = useState('');
 
@@ -43,6 +46,7 @@ export default function EmployeeDashboard({ user }) {
     const [payslipModalOpen, setPayslipModalOpen] = useState(false);
     const [selectedPayslip, setSelectedPayslip] = useState(null);
     const [payslipDetailLoading, setPayslipDetailLoading] = useState(false);
+    const [payslipActionLoadingId, setPayslipActionLoadingId] = useState(null);
 
     const tabs = [
         { key: 'overview', label: 'Overview', icon: <FiHome className="mr-2" /> },
@@ -69,7 +73,7 @@ export default function EmployeeDashboard({ user }) {
     useEffect(() => {
         const fetchLeaveRequests = async () => {
             try {
-                const data = await fetchJson('tenant/employee/leave-requests');
+                const data = await fetchJson('/tenant/employee/leave-requests');
                 if (data?.ok) {
                     setLeaveRequests(Array.isArray(data.requests) ? data.requests : []);
                 }
@@ -85,7 +89,7 @@ export default function EmployeeDashboard({ user }) {
         setPayslipsLoading(true);
         setPayslipsError('');
         try {
-            const data = await fetchJson('tenant/employee/payslips');
+            const data = await fetchJson('/tenant/employee/payslips');
             if (data?.ok) {
                 setPayslips(Array.isArray(data.payslips) ? data.payslips : []);
             }
@@ -130,7 +134,7 @@ export default function EmployeeDashboard({ user }) {
         setVisualConfirmed(false);
     }, []);
 
-    const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const csrfToken = () => csrfTokenRef.current || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
     const appBasePath = () => {
         const raw = document.querySelector('meta[name="app-base-url"]')?.getAttribute('content');
@@ -181,11 +185,12 @@ export default function EmployeeDashboard({ user }) {
     };
 
     const fetchJson = async (url, options = {}) => {
-        const method = (options.method || 'GET').toUpperCase();
-        const isJsonBody = options.body && typeof options.body === 'string';
+        const { __csrfRetried, ...fetchOptions } = options;
+        const method = (fetchOptions.method || 'GET').toUpperCase();
+        const isJsonBody = fetchOptions.body && typeof fetchOptions.body === 'string';
 
         const res = await fetch(normalizeSameOriginUrl(url), {
-            ...options,
+            ...fetchOptions,
             method,
             credentials: 'include',
             headers: {
@@ -194,17 +199,38 @@ export default function EmployeeDashboard({ user }) {
                 ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
                 ...(csrfToken() ? { 'X-CSRF-TOKEN': csrfToken() } : {}),
                 ...(xsrfTokenFromCookie() ? { 'X-XSRF-TOKEN': xsrfTokenFromCookie() } : {}),
-                ...(options.headers || {}),
+                ...(fetchOptions.headers || {}),
             },
         });
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+            if (res.status === 419 && !__csrfRetried) {
+                try {
+                    const tokenRes = await fetch(normalizeSameOriginUrl('/tenant/csrf-token'), {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+                    const tokenData = await tokenRes.json().catch(() => ({}));
+                    if (tokenRes.ok && tokenData?.token) {
+                        csrfTokenRef.current = tokenData.token;
+                        return fetchJson(url, { ...options, __csrfRetried: true });
+                    }
+                } catch {
+                    // fall through
+                }
+            }
+
             const message = res.status === 419
                 ? 'Session/CSRF expired. Refresh the page and try again.'
                 : (data?.message || `Request failed (${res.status})`);
             throw new Error(message);
         }
+
         return data;
     };
 
@@ -282,10 +308,12 @@ export default function EmployeeDashboard({ user }) {
         setLeaveForm({ ...leaveForm, [e.target.name]: e.target.value });
     };
 
-    const submitLeaveRequest = (e) => {
+    const submitLeaveRequest = async (e) => {
         e.preventDefault();
         setLeaveError('');
         setLeaveSuccess('');
+
+        if (leaveSubmitLoading) return;
 
         if (!leaveForm.start_date || !leaveForm.end_date) {
             setLeaveError('Start date and end date are required.');
@@ -299,40 +327,36 @@ export default function EmployeeDashboard({ user }) {
             return;
         }
 
-        fetch(route('tenant.employee.leave.store'), {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                leave_type: leaveForm.leave_type,
-                start_date: leaveForm.start_date,
-                end_date: leaveForm.end_date,
-                reason: leaveForm.reason,
-            }),
-        })
-            .then(async (res) => {
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok) {
-                    setLeaveError(data?.message || 'Failed to submit leave request.');
-                    return;
-                }
-
-                setLeaveRequests((prev) => [data.leave, ...prev]);
-                setLeaveForm({
-                    leave_type: 'annual',
-                    start_date: '',
-                    end_date: '',
-                    reason: '',
-                });
-                setLeaveSuccess('Leave request submitted.');
-            })
-            .catch(() => {
-                setLeaveError('Failed to submit leave request.');
+        setLeaveSubmitLoading(true);
+        try {
+            const data = await fetchJson('/tenant/employee/leave-requests', {
+                method: 'POST',
+                body: JSON.stringify({
+                    leave_type: leaveForm.leave_type,
+                    start_date: leaveForm.start_date,
+                    end_date: leaveForm.end_date,
+                    reason: leaveForm.reason,
+                }),
             });
+
+            if (!data?.ok) {
+                setLeaveError(data?.message || 'Failed to submit leave request.');
+                return;
+            }
+
+            setLeaveRequests((prev) => [data.leave, ...prev]);
+            setLeaveForm({
+                leave_type: 'annual',
+                start_date: '',
+                end_date: '',
+                reason: '',
+            });
+            setLeaveSuccess('Leave request submitted.');
+        } catch (err) {
+            setLeaveError(String(err?.message || 'Failed to submit leave request.'));
+        } finally {
+            setLeaveSubmitLoading(false);
+        }
     };
 
     const viewLeaveRequest = (req) => {
@@ -346,10 +370,11 @@ export default function EmployeeDashboard({ user }) {
     const viewPayslip = (p) => {
         const pid = p?.payroll_id;
         if (!pid) return;
+        setPayslipActionLoadingId(pid);
         setPayslipDetailLoading(true);
         setPayslipModalOpen(true);
         setSelectedPayslip(null);
-        fetchJson(`tenant/employee/payslips/${pid}`)
+        fetchJson(`/tenant/employee/payslips/${pid}`)
             .then((data) => {
                 const ps = data?.payslip;
                 if (!data?.ok || !ps) {
@@ -365,13 +390,14 @@ export default function EmployeeDashboard({ user }) {
             })
             .finally(() => {
                 setPayslipDetailLoading(false);
+                setPayslipActionLoadingId(null);
             });
     };
 
     const downloadPayslip = (p) => {
         const pid = p?.payroll_id;
         if (!pid) return;
-        window.location.href = endpoint(`tenant/employee/payslips/${pid}/export`);
+        window.location.href = normalizeSameOriginUrl(`/tenant/employee/payslips/${pid}/export`);
     };
 
     return (
@@ -530,6 +556,81 @@ export default function EmployeeDashboard({ user }) {
                             </div>
                         </div>
 
+                        {payslipModalOpen && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <div className="absolute inset-0 bg-black/50" onClick={() => setPayslipModalOpen(false)} />
+                                <div className="relative w-full max-w-2xl bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                        <div>
+                                            <div className="text-lg font-bold">Payslip Details</div>
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">{selectedPayslip?.period || 'Loading…'}</div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPayslipModalOpen(false)}
+                                            className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        >
+                                            <FiX />
+                                        </button>
+                                    </div>
+
+                                    <div className="p-6">
+                                        {payslipDetailLoading && (
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">Loading payslip…</div>
+                                        )}
+
+                                        {!payslipDetailLoading && selectedPayslip && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Gross</div>
+                                                    <div className="text-lg font-semibold">{selectedPayslip.gross}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Net</div>
+                                                    <div className="text-lg font-semibold">{selectedPayslip.net}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Bonus</div>
+                                                    <div className="text-lg font-semibold">{selectedPayslip.bonus}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Deductions</div>
+                                                    <div className="text-lg font-semibold">{selectedPayslip.deductions}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Tax</div>
+                                                    <div className="text-lg font-semibold">{selectedPayslip.tax}</div>
+                                                </div>
+                                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Adjustments</div>
+                                                    <div className="text-lg font-semibold">{selectedPayslip.adjustments}</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                                        {selectedPayslip?.payroll_id && (
+                                            <button
+                                                type="button"
+                                                onClick={() => downloadPayslip({ payroll_id: selectedPayslip.payroll_id })}
+                                                className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700"
+                                            >
+                                                <FiDownload className="mr-2" /> Download CSV
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setPayslipModalOpen(false)}
+                                            className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'overview' && (
                             <div className="grid gap-6 lg:grid-cols-3">
                                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -584,6 +685,7 @@ export default function EmployeeDashboard({ user }) {
                                                         onClick={() => {
                                                             setActiveTab('payslips');
                                                             loadPayslips();
+                                                            viewPayslip(p);
                                                         }}
                                                         className="px-3 py-2 rounded-lg text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200"
                                                     >
@@ -595,80 +697,6 @@ export default function EmployeeDashboard({ user }) {
                                     </div>
                                 </div>
 
-                                {payslipModalOpen && (
-                                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                                        <div className="absolute inset-0 bg-black/50" onClick={() => setPayslipModalOpen(false)} />
-                                        <div className="relative w-full max-w-2xl bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                                                <div>
-                                                    <div className="text-lg font-bold">Payslip Details</div>
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">{selectedPayslip?.period || 'Loading…'}</div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPayslipModalOpen(false)}
-                                                    className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                >
-                                                    <FiX />
-                                                </button>
-                                            </div>
-
-                                            <div className="p-6">
-                                                {payslipDetailLoading && (
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">Loading payslip…</div>
-                                                )}
-
-                                                {!payslipDetailLoading && selectedPayslip && (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Gross</div>
-                                                            <div className="text-lg font-semibold">{selectedPayslip.gross}</div>
-                                                        </div>
-                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Net</div>
-                                                            <div className="text-lg font-semibold">{selectedPayslip.net}</div>
-                                                        </div>
-                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Bonus</div>
-                                                            <div className="text-lg font-semibold">{selectedPayslip.bonus}</div>
-                                                        </div>
-                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Deductions</div>
-                                                            <div className="text-lg font-semibold">{selectedPayslip.deductions}</div>
-                                                        </div>
-                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Tax</div>
-                                                            <div className="text-lg font-semibold">{selectedPayslip.tax}</div>
-                                                        </div>
-                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Adjustments</div>
-                                                            <div className="text-lg font-semibold">{selectedPayslip.adjustments}</div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
-                                                {selectedPayslip?.payroll_id && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => downloadPayslip({ payroll_id: selectedPayslip.payroll_id })}
-                                                        className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700"
-                                                    >
-                                                        <FiDownload className="mr-2" /> Download CSV
-                                                    </button>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPayslipModalOpen(false)}
-                                                    className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                >
-                                                    Close
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         )}
 
@@ -896,9 +924,10 @@ export default function EmployeeDashboard({ user }) {
                                             </button>
                                             <button
                                                 type="submit"
-                                                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700"
+                                                disabled={leaveSubmitLoading}
+                                                className={`px-4 py-2 rounded-lg text-sm font-semibold text-white ${leaveSubmitLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                                             >
-                                                Submit Request
+                                                {leaveSubmitLoading ? 'Submitting…' : 'Submit Request'}
                                             </button>
                                         </div>
                                     </form>
@@ -906,19 +935,44 @@ export default function EmployeeDashboard({ user }) {
 
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                     <h3 className="text-lg font-bold mb-3">My Requests</h3>
-                                    <div className="space-y-2">
+
+                                    <div className="flex items-center justify-between gap-3 mb-4">
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                            {leaveRequests.length} request(s)
+                                        </div>
+                                        {leaveRequests.length > 2 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllLeaveRequests((v) => !v)}
+                                                className="px-3 py-2 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                            >
+                                                {showAllLeaveRequests ? 'View Less' : 'View All'}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className={`space-y-2 ${showAllLeaveRequests ? 'max-h-[420px]' : 'max-h-[210px]'} overflow-y-auto pr-1`}>
                                         {leaveRequests.length === 0 ? (
                                             <div className="text-sm text-gray-500 dark:text-gray-400">No leave requests yet.</div>
                                         ) : (
-                                            leaveRequests.slice(0, 6).map((r) => (
+                                            leaveRequests.map((r) => (
                                                 <div key={r.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-transparent dark:border-gray-700">
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div>
                                                             <div className="text-sm font-semibold text-gray-900 dark:text-white">{r.leave_type}</div>
                                                             <div className="text-xs text-gray-500 dark:text-gray-400">{r.start_date} → {r.end_date}</div>
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Submitted: {r.submitted_at}</div>
+                                                            {(r.submitted_at || r.created_at) ? (
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400">Submitted: {r.submitted_at || r.created_at}</div>
+                                                            ) : null}
                                                         </div>
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                                        <span
+                                                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${String(r.status).toLowerCase() === 'approved'
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : (String(r.status).toLowerCase() === 'rejected'
+                                                                    ? 'bg-red-100 text-red-800'
+                                                                    : 'bg-yellow-100 text-yellow-800')
+                                                                }`}
+                                                        >
                                                             {r.status}
                                                         </span>
                                                     </div>
@@ -933,7 +987,7 @@ export default function EmployeeDashboard({ user }) {
                                                         >
                                                             View
                                                         </button>
-                                                        {r.status === 'Pending' && (
+                                                        {String(r.status).toLowerCase() === 'pending' && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => cancelLeaveRequest(r.id)}
@@ -1011,9 +1065,10 @@ export default function EmployeeDashboard({ user }) {
                                                         <button
                                                             type="button"
                                                             onClick={() => viewPayslip(p)}
+                                                            disabled={payslipActionLoadingId === p.payroll_id}
                                                             className="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700"
                                                         >
-                                                            View
+                                                            {payslipActionLoadingId === p.payroll_id ? 'Loading…' : 'View'}
                                                         </button>
                                                         <button
                                                             type="button"

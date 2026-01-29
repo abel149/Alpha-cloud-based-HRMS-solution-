@@ -1,4 +1,5 @@
 import ApplicationLogo from '@/Components/ApplicationLogo';
+import FlashMessages from '@/Components/FlashMessages';
 import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
@@ -189,6 +190,8 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
                 </header>
             )}
+
+            <FlashMessages />
 
             <main>{children}</main>
         </div>

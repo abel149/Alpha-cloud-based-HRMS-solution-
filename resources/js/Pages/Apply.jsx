@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { FiBriefcase, FiMail, FiDollarSign, FiArrowRight, FiCheckCircle, FiArrowLeft } from 'react-icons/fi';
 
-export default function ApplyTenant() {
+export default function ApplyTenant({ subscriptionPlans = [] }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  
+
+  const plans = Array.isArray(subscriptionPlans) ? subscriptionPlans : [];
+
   const [form, setForm] = useState({
     company_name: '',
     email: '',
-    plan: 'basic',
+    plan: plans?.[0]?.planId || '',
   });
 
   const handleChange = (e) => {
@@ -137,69 +139,51 @@ export default function ApplyTenant() {
                 <div className="lg:border-l lg:border-gray-200 dark:lg:border-gray-700 lg:pl-6">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Choose Your Plan</h3>
                   <div className="grid gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {[
-                        { id: 'basic', name: 'Basic', price: '$29', features: ['Up to 10 employees', 'Basic features'], recommended: false },
-                        { id: 'pro', name: 'Professional', price: '$99', features: ['Up to 50 employees', 'Advanced features'], recommended: true }
-                      ].map((plan) => (
-                      <div 
-                        key={plan.id}
-                        className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                          form.plan === plan.id 
-                            ? 'ring-1 ring-blue-500 border-transparent bg-blue-50 dark:bg-blue-900/20' 
-                            : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                        } ${plan.recommended ? 'ring-1 ring-blue-500' : ''}`}
-                        onClick={() => setForm({...form, plan: plan.id})}
-                      >
-                        {plan.recommended && (
-                          <span className="absolute -top-2 right-3 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                            Recommended
-                          </span>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-base font-medium text-gray-900 dark:text-white">{plan.name}</h4>
-                          <span className="text-base font-bold text-blue-600 dark:text-blue-400">
-                            {plan.price}
-                            {plan.price !== 'Custom' && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/month</span>}
-                          </span>
-                        </div>
-                        <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
-                          {plan.features.map((feature, i) => (
-                            <li key={i} className="flex items-start">
-                              <FiCheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 mr-1.5 flex-shrink-0" />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
+                    {plans.length === 0 ? (
+                      <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300">
+                        No subscription plans are currently available.
                       </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-1">
-                      <div 
-                        key="enterprise"
-                        className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                          form.plan === 'enterprise' 
-                            ? 'ring-1 ring-blue-500 border-transparent bg-blue-50 dark:bg-blue-900/20' 
-                            : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                        }`}
-                        onClick={() => setForm({...form, plan: 'enterprise'})}
-                      >
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-base font-medium text-gray-900 dark:text-white">Enterprise</h4>
-                          <span className="text-base font-bold text-blue-600 dark:text-blue-400">
-                            Custom
-                          </span>
-                        </div>
-                        <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
-                          {['Unlimited employees', 'All features', 'Dedicated support'].map((feature, i) => (
-                            <li key={i} className="flex items-start">
-                              <FiCheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 mr-1.5 flex-shrink-0" />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {plans.map((plan) => {
+                          const selected = form.plan === plan.planId;
+                          const features = String(plan.features || '')
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+
+                          return (
+                            <div
+                              key={plan.id}
+                              className={`relative border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
+                                selected
+                                  ? 'ring-1 ring-blue-500 border-transparent bg-blue-50 dark:bg-blue-900/20'
+                                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                              }`}
+                              onClick={() => setForm({ ...form, plan: plan.planId })}
+                            >
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-base font-medium text-gray-900 dark:text-white">{plan.name}</h4>
+                                <span className="text-base font-bold text-blue-600 dark:text-blue-400">
+                                  {plan.price}
+                                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/month</span>
+                                </span>
+                              </div>
+                              {features.length > 0 && (
+                                <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+                                  {features.map((feature, i) => (
+                                    <li key={i} className="flex items-start">
+                                      <FiCheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 mr-1.5 flex-shrink-0" />
+                                      <span>{feature}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>

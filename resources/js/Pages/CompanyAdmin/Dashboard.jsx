@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Inertia } from "@inertiajs/inertia";
-import { usePage } from '@inertiajs/inertia-react';
+import PaginationControls from '@/Components/PaginationControls';
+import FlashMessages from '@/Components/FlashMessages';
+import LoadingButton from '@/Components/LoadingButton';
+import { Inertia } from '@inertiajs/inertia';
+import { router, usePage } from '@inertiajs/inertia-react';
 import { FiUsers, FiBriefcase, FiCalendar, FiClock, FiShield, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX, FiCheck, FiSearch, FiEdit, FiTrash2, FiMoreVertical } from 'react-icons/fi';
-import PaginationControls from '../../Components/PaginationControls';
 
 export default function CompanyAdminDashboard({ employees = [], departments = [], leavePolicies = [], attendancePolicies = [], roles = [], permissions = [], stats }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -40,14 +42,6 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
 
     const { auth, errors, flash } = usePage().props;
     const user = auth?.user || {};
-
-    const [dismissedSuccess, setDismissedSuccess] = useState(false);
-
-    useEffect(() => {
-        if (flash?.success) {
-            setDismissedSuccess(false);
-        }
-    }, [flash?.success]);
 
     const scrollToTop = () => {
         try {
@@ -531,18 +525,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
             </header>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                {flash?.success && !dismissedSuccess && (
-                    <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800 flex items-start justify-between gap-4">
-                        <div className="text-sm font-medium">{flash.success}</div>
-                        <button
-                            type="button"
-                            onClick={() => setDismissedSuccess(true)}
-                            className="p-1 rounded hover:bg-green-100"
-                        >
-                            <FiX className="h-4 w-4" />
-                        </button>
-                    </div>
-                )}
+                <FlashMessages />
 
                 {/* Stats Overview for Dashboard Tab */}
                 {activeTab === "dashboard" && (
@@ -1157,13 +1140,14 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                         Cancel
                                     </button>
-                                    <button
+                                    <LoadingButton
                                         type="submit"
-                                        disabled={employeeSubmitting}
-                                        className={`px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all ${employeeSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        loading={employeeSubmitting}
+                                        loadingText={editingItem ? 'Updating...' : 'Creating...'}
+                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all"
                                     >
-                                        {employeeSubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Employee' : 'Create Employee')}
-                                    </button>
+                                        {editingItem ? 'Update Employee' : 'Create Employee'}
+                                    </LoadingButton>
                                 </div>
                             </form>
                         </div>
@@ -1215,13 +1199,14 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button
+                                    <LoadingButton
                                         type="submit"
-                                        disabled={departmentSubmitting}
-                                        className={`px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md ${departmentSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        loading={departmentSubmitting}
+                                        loadingText={editingItem ? 'Updating...' : 'Creating...'}
+                                        className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md"
                                     >
-                                        {departmentSubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Department' : 'Create Department')}
-                                    </button>
+                                        {editingItem ? 'Update Department' : 'Create Department'}
+                                    </LoadingButton>
                                 </div>
                             </form>
                         </div>
@@ -1300,13 +1285,14 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button
+                                    <LoadingButton
                                         type="submit"
-                                        disabled={leavePolicySubmitting}
-                                        className={`px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md ${leavePolicySubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        loading={leavePolicySubmitting}
+                                        loadingText={editingItem ? 'Updating...' : 'Creating...'}
+                                        className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md"
                                     >
-                                        {leavePolicySubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Policy' : 'Create Policy')}
-                                    </button>
+                                        {editingItem ? 'Update Policy' : 'Create Policy'}
+                                    </LoadingButton>
                                 </div>
                             </form>
                         </div>
@@ -1461,13 +1447,14 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button
+                                    <LoadingButton
                                         type="submit"
-                                        disabled={attendancePolicySubmitting}
-                                        className={`px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-md ${attendancePolicySubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        loading={attendancePolicySubmitting}
+                                        loadingText={editingItem ? 'Updating...' : 'Creating...'}
+                                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-md"
                                     >
-                                        {attendancePolicySubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Policy' : 'Create Policy')}
-                                    </button>
+                                        {editingItem ? 'Update Policy' : 'Create Policy'}
+                                    </LoadingButton>
                                 </div>
                             </form>
                         </div>
@@ -1541,13 +1528,14 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button
+                                    <LoadingButton
                                         type="submit"
-                                        disabled={roleSubmitting}
-                                        className={`px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md ${roleSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        loading={roleSubmitting}
+                                        loadingText={editingItem ? 'Updating...' : 'Creating...'}
+                                        className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md"
                                     >
-                                        {roleSubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Role' : 'Create Role')}
-                                    </button>
+                                        {editingItem ? 'Update Role' : 'Create Role'}
+                                    </LoadingButton>
                                 </div>
                             </form>
                         </div>

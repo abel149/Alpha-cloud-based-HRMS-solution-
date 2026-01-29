@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import FlashMessages from "@/Components/FlashMessages";
 import { Inertia } from "@inertiajs/inertia";
 
 import { FiUsers, FiFileText, FiCreditCard, FiPlus, FiChevronRight, FiLogOut, FiUser, FiSettings, FiChevronDown, FiX, FiLayout, FiDollarSign } from 'react-icons/fi';
@@ -46,9 +47,6 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
     // Get authenticated user data from props
     const user = auth?.user || {};
 
-    const flashSuccess = auth?.flash?.success;
-    const flashError = auth?.flash?.error;
-
     const formatDateTime = (v) => {
         if (!v) return '';
         const d = new Date(v);
@@ -80,13 +78,6 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
         features: "",
         durationDays: "",
     });
-    const [userForm, setUserForm] = useState({
-        tenantid: "",
-        name: "",
-        email: "",
-    });
-
-    const [userSubmitting, setUserSubmitting] = useState(false);
 
     const [editingTenant, setEditingTenant] = useState(null);
     const [editTenantForm, setEditTenantForm] = useState({
@@ -138,7 +129,8 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                 const cleared = new Set(provisioningAppIds);
                 cleared.delete(app.id);
                 setProvisioningAppIds(cleared);
-                setActiveTab("paidApps");
+                setActiveTab("tenants");
+                setTenantsPage(1);
             },
             onError: () => {
                 const cleared = new Set(provisioningAppIds);
@@ -157,22 +149,6 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                 setActiveTab("plans");
                 setPlansPage(1);
             },
-        });
-    };
-    const handleUserChange = (e) =>
-        setUserForm({ ...userForm, [e.target.name]: e.target.value });
-
-    const handleUserSubmit = (e) => {
-        e.preventDefault();
-        setUserSubmitting(true);
-        Inertia.post("/users", userForm, {
-            preserveScroll: true,
-            preserveState: false,
-            onSuccess: () => {
-                setActiveTab("users");
-                setUsersPage(1);
-            },
-            onFinish: () => setUserSubmitting(false),
         });
     };
 
@@ -341,20 +317,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
-            {(flashSuccess || flashError) && (
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-                    {flashSuccess && (
-                        <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 text-sm">
-                            {flashSuccess}
-                        </div>
-                    )}
-                    {flashError && (
-                        <div className={`${flashSuccess ? 'mt-3 ' : ''}p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 text-sm`}>
-                            {flashError}
-                        </div>
-                    )}
-                </div>
-            )}
+            <FlashMessages />
             {editingTenant && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
@@ -1143,63 +1106,9 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                         <div className="space-y-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold">Super Admin Users</h2>
-                                    <p className="text-gray-600 dark:text-gray-400">Manage platform users</p>
+                                    <h2 className="text-2xl font-bold">Company Admin Users</h2>
+                                    <p className="text-gray-600 dark:text-gray-400">Users are created automatically when you provision a tenant from a paid application</p>
                                 </div>
-                            </div>
-
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                <h3 className="text-lg font-semibold mb-4">Create Company Admin</h3>
-                                <form onSubmit={handleUserSubmit} className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tenant ID</label>
-                                            <input
-                                                type="number"
-                                                name="tenantid"
-                                                placeholder="Tenant ID"
-                                                value={userForm.tenantid}
-                                                onChange={handleUserChange}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                                            <input
-                                                type="text"
-                                                name="name"
-                                                placeholder="Full name"
-                                                value={userForm.name}
-                                                onChange={handleUserChange}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                                            <input
-                                                type="email"
-                                                name="email"
-                                                placeholder="email@example.com"
-                                                value={userForm.email}
-                                                onChange={handleUserChange}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end pt-2">
-                                        <button
-                                            type="submit"
-                                            disabled={userSubmitting}
-                                            className={`inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors ${userSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                        >
-                                            <FiPlus className="mr-2" />
-                                            {userSubmitting ? 'Creating…' : 'Create Company Admin'}
-                                        </button>
-                                    </div>
-                                </form>
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
