@@ -26,8 +26,8 @@ class IdentifyTenant
             abort(404, "Tenant not found");
         }
 
-        config(['database.connections.tenant.database' => $tenant->database]);
-        DB::setDefaultConnection('tenant');
+        config(['database.connections.Tenant.database' => $tenant->database]);
+        DB::setDefaultConnection('Tenant');
 
         return $next($request);
     }

@@ -27,13 +27,20 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request)
+    public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
 
         $request->session()->regenerate();
 
         $user = Auth::user(); // Logged-in user from central DB
+        
+        if (!$user) {
+            Auth::logout();
+            return redirect()->route('login')->withErrors([
+                'email' => 'Authentication failed. Please try again.',
+            ]);
+        }
         
         // Super Admin - redirect to tenant management
         if ($user->role === 'Super_admin') {
