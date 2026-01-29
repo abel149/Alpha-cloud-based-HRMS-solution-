@@ -62,6 +62,11 @@ class MigrateTenants extends Command
                         '--force' => true,
                     ]);
                     Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_11_30_120000_create_roles_and_permissions_tables.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
                         '--path' => 'database/migrations/tenant/2025_12_22_000003_add_wifi_and_fingerprint_to_attendance_policies_table.php',
                         '--database' => 'Tenant',
                         '--force' => true,
@@ -138,6 +143,11 @@ class MigrateTenants extends Command
                 try {
                     Artisan::call('migrate', [
                         '--path' => 'database/migrations/tenant/2025_12_15_000002_fix_all_tenant_tables_schema.php',
+                        '--database' => 'Tenant',
+                        '--force' => true,
+                    ]);
+                    Artisan::call('migrate', [
+                        '--path' => 'database/migrations/tenant/2025_11_30_120000_create_roles_and_permissions_tables.php',
                         '--database' => 'Tenant',
                         '--force' => true,
                     ]);
