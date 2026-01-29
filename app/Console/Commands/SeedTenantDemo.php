@@ -6,6 +6,7 @@ use App\Models\AttendanceLog;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\FinanceSetting;
+use App\Models\LeaveRequest;
 use App\Models\Payroll;
 use App\Models\PayrollItem;
 use App\Models\Tenant;
@@ -73,6 +74,8 @@ class SeedTenantDemo extends Command
         $dept = $this->seedDepartment($accounts['department_manager']['tenant_user']);
         $employees = $this->seedEmployees($tenantId, $dept, $employeeCount);
 
+        $this->seedLeaveRequests($employees);
+
         if (Schema::connection('Tenant')->hasTable('attendance_logs')) {
             $this->seedAttendance($employees, $month, $year, (bool) $this->option('reset-attendance'));
         } else {
@@ -92,6 +95,64 @@ class SeedTenantDemo extends Command
         $this->line('- Employees: emp1@demo.test .. empN@demo.test / password');
 
         return self::SUCCESS;
+    }
+
+    private function seedLeaveRequests(array $employees): void
+    {
+        if (!Schema::connection('Tenant')->hasTable('leave_requests')) {
+            $this->warn('leave_requests table not found in tenant DB. Skipping leave request seeding.');
+            return;
+        }
+
+        if (!Schema::connection('Tenant')->hasColumn('leave_requests', 'employee_id')) {
+            $this->warn('leave_requests table schema is incomplete (employee_id missing). Run tenant migrations. Skipping leave request seeding.');
+            return;
+        }
+
+        $this->info('Seeding demo leave requests...');
+
+        $types = ['annual', 'sick', 'unpaid', 'other'];
+        $created = 0;
+
+        foreach ($employees as $idx => $emp) {
+            $base = Carbon::now()->subDays(14 + ($idx % 10));
+
+            // 2 pending requests per employee (for approvals demo)
+            for ($i = 0; $i < 2; $i++) {
+                $start = $base->copy()->addDays(($i * 3) + 1)->toDateString();
+                $end = $base->copy()->addDays(($i * 3) + 2)->toDateString();
+                LeaveRequest::create([
+                    'employee_id' => $emp->id,
+                    'leave_type' => $types[($idx + $i) % count($types)],
+                    'start_date' => $start,
+                    'end_date' => $end,
+                    'reason' => 'Demo leave request',
+                    'status' => 'pending',
+                    'approved_by' => null,
+                    'approved_at' => null,
+                    'rejection_reason' => null,
+                ]);
+                $created++;
+            }
+
+            // 1 historical approved/rejected (for history/demo)
+            $start = $base->copy()->subDays(10)->toDateString();
+            $end = $base->copy()->subDays(8)->toDateString();
+            LeaveRequest::create([
+                'employee_id' => $emp->id,
+                'leave_type' => $types[($idx + 2) % count($types)],
+                'start_date' => $start,
+                'end_date' => $end,
+                'reason' => 'Demo past leave request',
+                'status' => ($idx % 2 === 0) ? 'approved' : 'rejected',
+                'approved_by' => null,
+                'approved_at' => Carbon::now()->subDays(7),
+                'rejection_reason' => ($idx % 2 === 0) ? null : 'Demo rejection reason',
+            ]);
+            $created++;
+        }
+
+        $this->info("Leave requests created: {$created}");
     }
 
     private function switchTenantConnection(string $databaseName): void
