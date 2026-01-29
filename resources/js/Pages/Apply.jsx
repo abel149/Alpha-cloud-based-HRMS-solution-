@@ -90,7 +90,7 @@ export default function ApplyTenant() {
                   
                   {/* Company Name Field */}
                   <div className="relative">
-                    <label htmlFor="company_name" className="block text-sm font-medium text-gray-300 mb-1">
+                    <label htmlFor="company_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Company Name
                     </label>
                     <div className="relative rounded-md shadow-sm">
@@ -112,7 +112,7 @@ export default function ApplyTenant() {
 
                   {/* Email Field */}
                   <div className="relative">
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Business Email
                     </label>
                     <div className="relative rounded-md shadow-sm">

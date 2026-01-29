@@ -462,20 +462,20 @@ const VisualConfirmation = ({
             setConfirmedAt(null);
         } else {
             return (
-                <div className={`bg-green-50 border border-green-200 rounded-lg p-4 ${className}`}>
+                <div className={`bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 ${className}`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                             <div>
-                                <p className="text-green-800 font-medium">Visual confirmation completed</p>
-                                <p className="text-green-600 text-sm">
+                                <p className="text-green-800 dark:text-green-200 font-medium">Visual confirmation completed</p>
+                                <p className="text-green-600 dark:text-green-300 text-sm">
                                     Confirmed at {confirmedTime.toLocaleTimeString()}
                                 </p>
                             </div>
                         </div>
                         <button
                             onClick={clearConfirmation}
-                            className="text-green-600 hover:text-green-800 p-1"
+                            className="text-green-600 hover:text-green-800 dark:text-green-300 dark:hover:text-green-200 p-1"
                             title="Clear confirmation"
                         >
                             <X className="w-4 h-4" />
@@ -487,26 +487,26 @@ const VisualConfirmation = ({
     }
 
     return (
-        <div className={`bg-white border border-gray-200 rounded-lg p-6 ${className}`}>
+        <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6 ${className}`}>
             <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     Visual Confirmation {required && <span className="text-red-500">*</span>}
                 </h3>
                 {message && (
-                    <p className="text-gray-600 text-sm">{message}</p>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">{message}</p>
                 )}
                 {!faceEnrolled && (
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         You must register a reference photo first.
                     </p>
                 )}
             </div>
 
             {error && (
-                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                     <div className="flex items-center space-x-2">
-                        <AlertCircle className="w-4 h-4 text-red-600" />
-                        <p className="text-red-700 text-sm">{error}</p>
+                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
                     </div>
                 </div>
             )}
@@ -514,7 +514,7 @@ const VisualConfirmation = ({
             {!capturedImage ? (
                 <div className="space-y-4">
                     {/* Camera View */}
-                    <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: '320px' }}>
+                    <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden" style={{ height: '320px' }}>
                         <video
                             ref={videoRef}
                             autoPlay
@@ -543,7 +543,7 @@ const VisualConfirmation = ({
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full p-8">
                                 <Camera className="w-16 h-16 text-gray-400 mb-4" />
-                                <p className="text-gray-600 mb-4 text-center">
+                                <p className="text-gray-600 dark:text-gray-300 mb-4 text-center">
                                     {faceEnrolled ? 'Step 2: Take a photo to verify your face' : 'Step 1: Take a photo to register your face'}
                                 </p>
                                 <div className="flex flex-col sm:flex-row gap-3">
@@ -572,7 +572,7 @@ const VisualConfirmation = ({
             ) : (
                 <div className="space-y-4">
                     {/* Captured Image Preview */}
-                    <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+                    <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
                         <img
                             src={capturedImage}
                             alt="Captured confirmation"

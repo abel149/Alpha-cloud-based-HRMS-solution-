@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Inertia } from "@inertiajs/inertia";
 import { usePage } from '@inertiajs/inertia-react';
 import { FiUsers, FiBriefcase, FiCalendar, FiClock, FiShield, FiPlus, FiLogOut, FiUser, FiChevronDown, FiX, FiCheck, FiSearch, FiEdit, FiTrash2, FiMoreVertical } from 'react-icons/fi';
@@ -17,6 +17,12 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     const [wifiDetectLoading, setWifiDetectLoading] = useState(false);
     const [wifiDetectError, setWifiDetectError] = useState('');
 
+    const [employeeSubmitting, setEmployeeSubmitting] = useState(false);
+    const [departmentSubmitting, setDepartmentSubmitting] = useState(false);
+    const [leavePolicySubmitting, setLeavePolicySubmitting] = useState(false);
+    const [attendancePolicySubmitting, setAttendancePolicySubmitting] = useState(false);
+    const [roleSubmitting, setRoleSubmitting] = useState(false);
+
     const [employeesPage, setEmployeesPage] = useState(1);
     const [employeesPageSize, setEmployeesPageSize] = useState(10);
 
@@ -32,8 +38,24 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     const [rolesPage, setRolesPage] = useState(1);
     const [rolesPageSize, setRolesPageSize] = useState(10);
 
-    const { auth } = usePage().props;
+    const { auth, errors, flash } = usePage().props;
     const user = auth?.user || {};
+
+    const [dismissedSuccess, setDismissedSuccess] = useState(false);
+
+    useEffect(() => {
+        if (flash?.success) {
+            setDismissedSuccess(false);
+        }
+    }, [flash?.success]);
+
+    const scrollToTop = () => {
+        try {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {
+            window.scrollTo(0, 0);
+        }
+    };
 
     const getInitials = (name) => {
         return name?.split(' ').map(part => part[0]).join('').toUpperCase().substring(0, 2) || 'U';
@@ -333,6 +355,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
     // Submit Handlers
     const handleEmployeeSubmit = (e) => {
         e.preventDefault();
+        setEmployeeSubmitting(true);
         const url = editingItem
             ? route('company-admin.employees.update', editingItem.id)
             : route('company-admin.employees.store');
@@ -340,19 +363,24 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         const method = editingItem ? 'put' : 'post';
 
         Inertia[method](url, employeeForm, {
+            preserveState: false,
             onSuccess: () => {
                 setShowEmployeeForm(false);
                 setEditingItem(null);
+                setEmployeesPage(1);
                 setEmployeeForm({
                     name: "", email: "", password: "", role: "employee", department_id: "",
                     hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time"
                 });
-            }
+                scrollToTop();
+            },
+            onFinish: () => setEmployeeSubmitting(false),
         });
     };
 
     const handleDepartmentSubmit = (e) => {
         e.preventDefault();
+        setDepartmentSubmitting(true);
         const url = editingItem
             ? route('company-admin.departments.update', editingItem.id)
             : route('company-admin.departments.store');
@@ -360,16 +388,21 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         const method = editingItem ? 'put' : 'post';
 
         Inertia[method](url, departmentForm, {
+            preserveState: false,
             onSuccess: () => {
                 setShowDepartmentForm(false);
                 setEditingItem(null);
+                setDepartmentsPage(1);
                 setDepartmentForm({ name: "", description: "", manager_id: "" });
-            }
+                scrollToTop();
+            },
+            onFinish: () => setDepartmentSubmitting(false),
         });
     };
 
     const handleLeavePolicySubmit = (e) => {
         e.preventDefault();
+        setLeavePolicySubmitting(true);
         const url = editingItem
             ? route('company-admin.leave-policies.update', editingItem.id)
             : route('company-admin.leave-policies.store');
@@ -377,18 +410,23 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         const method = editingItem ? 'put' : 'post';
 
         Inertia[method](url, leavePolicyForm, {
+            preserveState: false,
             onSuccess: () => {
                 setShowLeavePolicyForm(false);
                 setEditingItem(null);
+                setLeavePoliciesPage(1);
                 setLeavePolicyForm({
                     policy_name: "", leave_type: "", days_allowed_per_year: "", is_paid: true, description: "", max_consecutive_days: ""
                 });
-            }
+                scrollToTop();
+            },
+            onFinish: () => setLeavePolicySubmitting(false),
         });
     };
 
     const handleAttendancePolicySubmit = (e) => {
         e.preventDefault();
+        setAttendancePolicySubmitting(true);
         const url = editingItem
             ? route('company-admin.attendance-policies.update', editingItem.id)
             : route('company-admin.attendance-policies.store');
@@ -396,9 +434,11 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         const method = editingItem ? 'put' : 'post';
 
         Inertia[method](url, attendancePolicyForm, {
+            preserveState: false,
             onSuccess: () => {
                 setShowAttendancePolicyForm(false);
                 setEditingItem(null);
+                setAttendancePoliciesPage(1);
                 setAttendancePolicyForm({
                     policy_name: "", work_start_time: "09:00", work_end_time: "17:00", grace_period_minutes: 15, minimum_work_hours: 8,
                     requires_company_wifi: false,
@@ -408,12 +448,15 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                     requires_visual_confirmation: false,
                     visual_confirmation_message: "",
                 });
-            }
+                scrollToTop();
+            },
+            onFinish: () => setAttendancePolicySubmitting(false),
         });
     };
 
     const handleRoleSubmit = (e) => {
         e.preventDefault();
+        setRoleSubmitting(true);
         const url = editingItem
             ? route('company-admin.roles.update', editingItem.id)
             : route('company-admin.roles.store');
@@ -421,11 +464,15 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
         const method = editingItem ? 'put' : 'post';
 
         Inertia[method](url, roleForm, {
+            preserveState: false,
             onSuccess: () => {
                 setShowRoleForm(false);
                 setEditingItem(null);
+                setRolesPage(1);
                 setRoleForm({ name: "", display_name: "", description: "", permissions: [] });
-            }
+                scrollToTop();
+            },
+            onFinish: () => setRoleSubmitting(false),
         });
     };
 
@@ -484,6 +531,19 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
             </header>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                {flash?.success && !dismissedSuccess && (
+                    <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800 flex items-start justify-between gap-4">
+                        <div className="text-sm font-medium">{flash.success}</div>
+                        <button
+                            type="button"
+                            onClick={() => setDismissedSuccess(true)}
+                            className="p-1 rounded hover:bg-green-100"
+                        >
+                            <FiX className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
+
                 {/* Stats Overview for Dashboard Tab */}
                 {activeTab === "dashboard" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -613,25 +673,29 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <h3 className="text-xl font-bold">Staff Directory</h3>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="relative">
-                                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                            <input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setEmployeesPage(1); }}
-                                                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 w-full md:w-64" />
-                                        </div>
-                                        <button onClick={() => { setEditingItem(null); setEmployeeForm({ name: "", email: "", password: "", role: "employee", department_id: "", hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time" }); setShowEmployeeForm(true); }}
-                                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-sm">
-                                            <FiPlus className="mr-2" /> Add Employee
-                                        </button>
-                                    </div>
+                                    <button onClick={() => { setEditingItem(null); setEmployeeForm({ name: "", email: "", password: "", role: "employee", department_id: "", hire_date: "", job_title: "", employee_code: "", phone: "", salary: "", employment_type: "full_time" }); setShowEmployeeForm(true); }}
+                                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-sm">
+                                        <FiPlus className="mr-2" /> Add Employee
+                                    </button>
                                 </div>
-                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                    <div className="relative w-full lg:max-w-sm">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search employees..."
+                                            value={searchTerm}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setEmployeesPage(1); scrollToTop(); }}
+                                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 w-full"
+                                        />
+                                    </div>
                                     <PaginationControls
                                         page={employeesPage}
                                         pageSize={employeesPageSize}
                                         total={filteredEmployees.length}
-                                        onPageChange={(p) => setEmployeesPage(p)}
-                                        onPageSizeChange={(n) => { setEmployeesPageSize(n); setEmployeesPage(1); }}
+                                        onPageChange={(p) => { setEmployeesPage(p); scrollToTop(); }}
+                                        onPageSizeChange={(n) => { setEmployeesPageSize(n); setEmployeesPage(1); scrollToTop(); }}
+                                        className="w-full lg:w-auto"
                                     />
                                 </div>
                                 <div className="overflow-x-auto">
@@ -705,7 +769,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             type="text"
                                             placeholder="Search departments..."
                                             value={searchTerm}
-                                            onChange={(e) => { setSearchTerm(e.target.value); setDepartmentsPage(1); }}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setDepartmentsPage(1); scrollToTop(); }}
                                             className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 w-full"
                                         />
                                     </div>
@@ -713,8 +777,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         page={departmentsPage}
                                         pageSize={departmentsPageSize}
                                         total={filteredDepartments.length}
-                                        onPageChange={(p) => setDepartmentsPage(p)}
-                                        onPageSizeChange={(n) => { setDepartmentsPageSize(n); setDepartmentsPage(1); }}
+                                        onPageChange={(p) => { setDepartmentsPage(p); scrollToTop(); }}
+                                        onPageSizeChange={(n) => { setDepartmentsPageSize(n); setDepartmentsPage(1); scrollToTop(); }}
                                         className="w-full lg:w-auto"
                                     />
                                 </div>
@@ -768,7 +832,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             type="text"
                                             placeholder="Search leave policies..."
                                             value={searchTerm}
-                                            onChange={(e) => { setSearchTerm(e.target.value); setLeavePoliciesPage(1); }}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setLeavePoliciesPage(1); scrollToTop(); }}
                                             className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 w-full"
                                         />
                                     </div>
@@ -776,8 +840,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         page={leavePoliciesPage}
                                         pageSize={leavePoliciesPageSize}
                                         total={filteredLeavePolicies.length}
-                                        onPageChange={(p) => setLeavePoliciesPage(p)}
-                                        onPageSizeChange={(n) => { setLeavePoliciesPageSize(n); setLeavePoliciesPage(1); }}
+                                        onPageChange={(p) => { setLeavePoliciesPage(p); scrollToTop(); }}
+                                        onPageSizeChange={(n) => { setLeavePoliciesPageSize(n); setLeavePoliciesPage(1); scrollToTop(); }}
                                         className="w-full lg:w-auto"
                                     />
                                 </div>
@@ -837,7 +901,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             type="text"
                                             placeholder="Search attendance policies..."
                                             value={searchTerm}
-                                            onChange={(e) => { setSearchTerm(e.target.value); setAttendancePoliciesPage(1); }}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setAttendancePoliciesPage(1); scrollToTop(); }}
                                             className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 w-full"
                                         />
                                     </div>
@@ -845,8 +909,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         page={attendancePoliciesPage}
                                         pageSize={attendancePoliciesPageSize}
                                         total={filteredAttendancePolicies.length}
-                                        onPageChange={(p) => setAttendancePoliciesPage(p)}
-                                        onPageSizeChange={(n) => { setAttendancePoliciesPageSize(n); setAttendancePoliciesPage(1); }}
+                                        onPageChange={(p) => { setAttendancePoliciesPage(p); scrollToTop(); }}
+                                        onPageSizeChange={(n) => { setAttendancePoliciesPageSize(n); setAttendancePoliciesPage(1); scrollToTop(); }}
                                         className="w-full lg:w-auto"
                                     />
                                 </div>
@@ -902,7 +966,7 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                             type="text"
                                             placeholder="Search roles..."
                                             value={searchTerm}
-                                            onChange={(e) => { setSearchTerm(e.target.value); setRolesPage(1); }}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setRolesPage(1); scrollToTop(); }}
                                             className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 w-full"
                                         />
                                     </div>
@@ -910,8 +974,8 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         page={rolesPage}
                                         pageSize={rolesPageSize}
                                         total={filteredRoles.length}
-                                        onPageChange={(p) => setRolesPage(p)}
-                                        onPageSizeChange={(n) => { setRolesPageSize(n); setRolesPage(1); }}
+                                        onPageChange={(p) => { setRolesPage(p); scrollToTop(); }}
+                                        onPageSizeChange={(n) => { setRolesPageSize(n); setRolesPage(1); scrollToTop(); }}
                                         className="w-full lg:w-auto"
                                     />
                                 </div>
@@ -970,6 +1034,21 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                             <h3 className="text-2xl font-bold mb-6">{editingItem ? 'Edit Employee' : 'Add New Employee'}</h3>
 
                             <form onSubmit={handleEmployeeSubmit} className="space-y-6">
+                                {(errors?.name || errors?.email || errors?.password || errors?.role || errors?.department_id || errors?.hire_date || errors?.job_title || errors?.employee_code || errors?.phone || errors?.salary || errors?.employment_type) && (
+                                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
+                                        {errors?.name && <div>{errors.name}</div>}
+                                        {errors?.email && <div>{errors.email}</div>}
+                                        {errors?.password && <div>{errors.password}</div>}
+                                        {errors?.role && <div>{errors.role}</div>}
+                                        {errors?.department_id && <div>{errors.department_id}</div>}
+                                        {errors?.hire_date && <div>{errors.hire_date}</div>}
+                                        {errors?.job_title && <div>{errors.job_title}</div>}
+                                        {errors?.employee_code && <div>{errors.employee_code}</div>}
+                                        {errors?.phone && <div>{errors.phone}</div>}
+                                        {errors?.salary && <div>{errors.salary}</div>}
+                                        {errors?.employment_type && <div>{errors.employment_type}</div>}
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Name */}
                                     <div>
@@ -1078,9 +1157,12 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                         Cancel
                                     </button>
-                                    <button type="submit"
-                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all">
-                                        {editingItem ? 'Update Employee' : 'Create Employee'}
+                                    <button
+                                        type="submit"
+                                        disabled={employeeSubmitting}
+                                        className={`px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all ${employeeSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
+                                        {employeeSubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Employee' : 'Create Employee')}
                                     </button>
                                 </div>
                             </form>
@@ -1133,9 +1215,12 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button type="submit"
-                                        className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md">
-                                        {editingItem ? 'Update Department' : 'Create Department'}
+                                    <button
+                                        type="submit"
+                                        disabled={departmentSubmitting}
+                                        className={`px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md ${departmentSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
+                                        {departmentSubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Department' : 'Create Department')}
                                     </button>
                                 </div>
                             </form>
@@ -1215,9 +1300,12 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button type="submit"
-                                        className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md">
-                                        {editingItem ? 'Update Policy' : 'Create Policy'}
+                                    <button
+                                        type="submit"
+                                        disabled={leavePolicySubmitting}
+                                        className={`px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md ${leavePolicySubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
+                                        {leavePolicySubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Policy' : 'Create Policy')}
                                     </button>
                                 </div>
                             </form>
@@ -1373,9 +1461,12 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button type="submit"
-                                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-md">
-                                        {editingItem ? 'Update Policy' : 'Create Policy'}
+                                    <button
+                                        type="submit"
+                                        disabled={attendancePolicySubmitting}
+                                        className={`px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-md ${attendancePolicySubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
+                                        {attendancePolicySubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Policy' : 'Create Policy')}
                                     </button>
                                 </div>
                             </form>
@@ -1450,9 +1541,12 @@ export default function CompanyAdminDashboard({ employees = [], departments = []
                                         className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
                                         Cancel
                                     </button>
-                                    <button type="submit"
-                                        className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md">
-                                        {editingItem ? 'Update Role' : 'Create Role'}
+                                    <button
+                                        type="submit"
+                                        disabled={roleSubmitting}
+                                        className={`px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md ${roleSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
+                                        {roleSubmitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Role' : 'Create Role')}
                                     </button>
                                 </div>
                             </form>

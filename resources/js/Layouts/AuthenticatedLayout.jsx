@@ -23,14 +23,14 @@ export default function AuthenticatedLayout({ header, children }) {
         useState(false);
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            <nav className="border-b border-gray-100 bg-white">
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-white">
+            <nav className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 justify-between">
                         <div className="flex">
                             <div className="flex shrink-0 items-center">
                                 <Link href="/">
-                                    <ApplicationLogo className="block h-9 w-auto fill-current text-gray-800" />
+                                    <ApplicationLogo className="block h-9 w-auto fill-current text-gray-800 dark:text-gray-200" />
                                 </Link>
                             </div>
 
@@ -51,16 +51,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                         <span className="inline-flex rounded-md">
                                             <button
                                                 type="button"
-                                                className="flex items-center space-x-2 rounded-full border-2 border-transparent p-1 text-sm transition duration-150 ease-in-out hover:border-gray-200 focus:outline-none"
+                                                className="flex items-center space-x-2 rounded-full border-2 border-transparent p-1 text-sm transition duration-150 ease-in-out hover:border-gray-200 dark:hover:border-gray-700 focus:outline-none"
                                             >
                                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
                                                     <span className="text-sm font-medium">{getInitials(user.name)}</span>
                                                 </div>
-                                                <span className="hidden text-sm font-medium text-gray-700 md:block">
+                                                <span className="hidden text-sm font-medium text-gray-700 dark:text-gray-200 md:block">
                                                     {user.name}
                                                 </span>
                                                 <svg
-                                                    className="h-4 w-4 text-gray-500"
+                                                    className="h-4 w-4 text-gray-500 dark:text-gray-400"
                                                     xmlns="http://www.w3.org/2000/svg"
                                                     viewBox="0 0 20 20"
                                                     fill="currentColor"
@@ -100,7 +100,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         (previousState) => !previousState,
                                     )
                                 }
-                                className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none"
+                                className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 dark:text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-200 focus:bg-gray-100 focus:text-gray-500 dark:focus:bg-gray-800 dark:focus:text-gray-200 focus:outline-none"
                             >
                                 <svg
                                     className="h-6 w-6"
@@ -151,16 +151,16 @@ export default function AuthenticatedLayout({ header, children }) {
                         </ResponsiveNavLink>
                     </div>
 
-                    <div className="border-t border-gray-200 pb-1 pt-4">
+                    <div className="border-t border-gray-200 dark:border-gray-800 pb-1 pt-4">
                         <div className="flex items-center px-4 py-3">
                             <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white">
                                 <span className="text-sm font-medium">{getInitials(user.name)}</span>
                             </div>
                             <div>
-                                <div className="text-base font-medium text-gray-800">
+                                <div className="text-base font-medium text-gray-800 dark:text-gray-200">
                                     {user.name}
                                 </div>
-                                <div className="text-sm font-medium text-gray-500">
+                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                                     {user.email}
                                 </div>
                             </div>
@@ -183,7 +183,7 @@ export default function AuthenticatedLayout({ header, children }) {
             </nav>
 
             {header && (
-                <header className="bg-white shadow">
+                <header className="bg-white shadow dark:bg-gray-900">
                     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                         {header}
                     </div>

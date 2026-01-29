@@ -82,7 +82,6 @@ function LoginForm({ onClose }) {
         tenant_id: localStorage.getItem('login_tenant') || '',
         email: localStorage.getItem('login_email') || '',
         password: '',
-        role: localStorage.getItem('login_role') || 'employee',
         remember: localStorage.getItem('login_remember') === 'true' || false,
 
     });
@@ -91,7 +90,6 @@ function LoginForm({ onClose }) {
     useEffect(() => {
         localStorage.setItem('login_tenant', data.tenant_id);
         localStorage.setItem('login_email', data.email);
-        localStorage.setItem('login_role', data.role);
         localStorage.setItem('login_remember', data.remember);
     }, [data]);
 
@@ -104,7 +102,6 @@ function LoginForm({ onClose }) {
                 // Clear saved login data on successful login
                 localStorage.removeItem('login_tenant');
                 localStorage.removeItem('login_email');
-                localStorage.removeItem('login_role');
                 localStorage.removeItem('login_remember');
                 onClose?.();
             },
@@ -120,7 +117,16 @@ function LoginForm({ onClose }) {
 export default function Welcome({ auth, errors: serverErrors = {} }) {
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [darkMode, setDarkMode] = useState(false);
+    const [darkMode, setDarkMode] = useState(() => {
+        try {
+            const stored = localStorage.getItem('theme');
+            if (stored === 'dark') return true;
+            if (stored === 'light') return false;
+            return document.documentElement.classList.contains('dark');
+        } catch {
+            return false;
+        }
+    });
     const [scrolled, setScrolled] = useState(false);
 
     // Check URL for modal state on initial load
@@ -187,9 +193,32 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('theme');
+            if (stored === 'dark' || stored === 'light') {
+                const isDark = stored === 'dark';
+                setDarkMode(isDark);
+                document.documentElement.classList.toggle('dark', isDark);
+                return;
+            }
+            const prefersDark =
+                window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches;
+            setDarkMode(prefersDark);
+            document.documentElement.classList.toggle('dark', prefersDark);
+        } catch {
+        }
+    }, []);
+
     const toggleDarkMode = () => {
-        setDarkMode(!darkMode);
-        document.documentElement.classList.toggle('dark');
+        const next = !darkMode;
+        setDarkMode(next);
+        try {
+            localStorage.setItem('theme', next ? 'dark' : 'light');
+        } catch {
+        }
+        document.documentElement.classList.toggle('dark', next);
     };
 
     const loginHref = () => {
@@ -203,7 +232,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
     };
 
     return (
-        <div className={`min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all duration-300 ${activeModal === 'login' ? 'overflow-hidden' : ''} relative`}>
+        <div className={`min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-all duration-300 ${activeModal === 'login' ? 'overflow-hidden' : ''} relative`}>
             {/* Blur overlay for main content */}
             {activeModal === 'login' && (
                 <div
@@ -242,115 +271,95 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                     <p className="mt-2 text-gray-600 dark:text-gray-300 text-base md:text-lg">Sign in to your account</p>
                                 </div>
 
-                                <form onSubmit={submit} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Left Column */}
-                                        <div className="space-y-4">
-                                            <div>
-                                                <InputLabel
-                                                    htmlFor="tenant_id"
-                                                    value="Tenant ID (Optional for Super Admin)"
-                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                                                />
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
-                                                        <FiBriefcase />
-                                                    </span>
-                                                    <TextInput
-                                                        id="tenant_id"
-                                                        type="number"
-                                                        name="tenant_id"
-                                                        value={data.tenant_id}
-                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
-                                                        placeholder="e.g., 1 (leave empty for Super Admin)"
-                                                        autoComplete="off"
-                                                        onChange={(e) => setData('tenant_id', e.target.value)}
-                                                    />
-                                                </div>
-                                                <InputError message={errors.tenant_id} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-                                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                    Super Admin users can leave this field empty
-                                                </p>
-                                            </div>
-
-                                            <div>
-                                                <InputLabel
-                                                    htmlFor="email"
-                                                    value="Email"
-                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                                                />
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
-                                                        <FiUser />
-                                                    </span>
-                                                    <TextInput
-                                                        id="email"
-                                                        type="email"
-                                                        name="email"
-                                                        value={data.email}
-                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
-                                                        placeholder="your@email.com"
-                                                        autoComplete="username"
-                                                        onChange={(e) => setData('email', e.target.value)}
-                                                    />
-                                                </div>
-                                                <InputError message={errors.email} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-                                            </div>
+                                <form onSubmit={submit} className="space-y-5">
+                                    {/* Email */}
+                                    <div className="relative">
+                                        <InputLabel
+                                            htmlFor="email"
+                                            value="Email Address"
+                                            className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                                                <FiUser />
+                                            </span>
+                                            <TextInput
+                                                id="email"
+                                                type="email"
+                                                name="email"
+                                                value={data.email}
+                                                className="mt-1 block w-full h-11 text-sm rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                                                placeholder="your@email.com"
+                                                autoComplete="username"
+                                                onChange={(e) => setData('email', e.target.value)}
+                                            />
                                         </div>
-
-                                        {/* Right Column */}
-                                        <div className="space-y-4">
-                                            <div>
-                                                <InputLabel
-                                                    htmlFor="password"
-                                                    value="Password"
-                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                                                />
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
-                                                        <FiLock />
-                                                    </span>
-                                                    <TextInput
-                                                        id="password"
-                                                        type="password"
-                                                        name="password"
-                                                        value={data.password}
-                                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
-                                                        placeholder="••••••••"
-                                                        autoComplete="current-password"
-                                                        onChange={(e) => setData('password', e.target.value)}
-                                                    />
-                                                </div>
-                                                <InputError message={errors.password} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-                                            </div>
-
-                                            <div>
-                                                <InputLabel
-                                                    htmlFor="role"
-                                                    value="Role"
-                                                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                                                />
-                                                <select
-                                                    id="role"
-                                                    name="role"
-                                                    value={data.role}
-                                                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                                    onChange={(e) => setData('role', e.target.value)}
-                                                >
-                                                    <option value="company_admin">Company Admin</option>
-                                                    <option value="hr_manager">HR Manager</option>
-                                                    <option value="finance_manager">Finance Manager</option>
-                                                    <option value="department_manager">Department Manager</option>
-                                                    <option value="employee">Employee</option>
-                                                    <option value="Super_admin">Super Admin</option>
-                                                </select>
-                                                <InputError message={errors.role} className="mt-1 text-sm text-red-600 dark:text-red-400" />
-                                            </div>
-                                        </div>
+                                        <InputError message={errors.email} className="mt-1 text-sm text-red-600 dark:text-red-400" />
                                     </div>
 
-                                    {/* Remember me and Forgot Password */}
-                                    <div className="flex items-center justify-between mt-4">
+                                    {/* Password */}
+                                    <div className="relative">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <InputLabel
+                                                htmlFor="password"
+                                                value="Password"
+                                                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                            />
+                                            <Link
+                                                href={route('password.request')}
+                                                className="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                                            >
+                                                Forgot password?
+                                            </Link>
+                                        </div>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                                                <FiLock />
+                                            </span>
+                                            <TextInput
+                                                id="password"
+                                                type="password"
+                                                name="password"
+                                                value={data.password}
+                                                className="mt-1 block w-full h-11 text-sm rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                                                placeholder="••••••••"
+                                                autoComplete="current-password"
+                                                onChange={(e) => setData('password', e.target.value)}
+                                            />
+                                        </div>
+                                        <InputError message={errors.password} className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                                    </div>
+
+                                    {/* Company ID */}
+                                    <div className="relative">
+                                        <InputLabel
+                                            htmlFor="tenant_id"
+                                            value="Company ID"
+                                            className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-3 ml-2 h-6 w-6 text-gray-400 ">
+                                                <FiBriefcase />
+                                            </span>
+                                            <TextInput
+                                                id="tenant_id"
+                                                type="number"
+                                                name="tenant_id"
+                                                value={data.tenant_id}
+                                                className="mt-1 block w-full h-11 text-sm rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-12"
+                                                placeholder="Enter your company ID"
+                                                autoComplete="off"
+                                                onChange={(e) => setData('tenant_id', e.target.value)}
+                                            />
+                                        </div>
+                                        <InputError message={errors.tenant_id} className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Required for all users except Super Admin.
+                                        </p>
+                                    </div>
+
+                                    {/* Remember me and Sign In */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
                                         <label className="flex items-center">
                                             <Checkbox
                                                 name="remember"
@@ -361,21 +370,10 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                                             <span className="ms-2 text-sm text-gray-600 dark:text-gray-300">Remember me</span>
                                         </label>
 
-                                        <Link
-                                            href={route('password.request')}
-                                            className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-                                        >
-                                            Forgot password?
-                                        </Link>
-                                    </div>
-
-                                    {/* Buttons */}
-                                    <div className="pt-2 flex space-x-4">
-
                                         <button
                                             type="submit"
                                             disabled={processing}
-                                            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
+                                            className="w-full sm:w-auto px-6 py-2.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
                                         >
                                             <FiLogIn className="w-4 h-4 mr-2" />
                                             {processing ? 'Signing in...' : 'Sign in'}
@@ -423,7 +421,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                             ))}
                             <button
                                 onClick={toggleDarkMode}
-                                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                className="p-2 rounded-full border border-gray-200 bg-white/70 text-gray-700 hover:bg-white shadow-sm backdrop-blur transition-colors dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200 dark:hover:bg-gray-900"
                             >
                                 {darkMode ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
                             </button>
@@ -442,7 +440,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
                         <div className="sm:hidden flex items-center">
                             <button
                                 onClick={toggleDarkMode}
-                                className="p-2 mr-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                className="p-2 mr-2 rounded-full border border-gray-200 bg-white/70 text-gray-700 hover:bg-white shadow-sm backdrop-blur transition-colors dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200 dark:hover:bg-gray-900"
                             >
                                 {darkMode ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
                             </button>
@@ -490,7 +488,7 @@ export default function Welcome({ auth, errors: serverErrors = {} }) {
             </header>
             {/* Background with Gradient */}
             <div className="fixed inset-0 -z-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-white via-blue-50 to-indigo-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800"></div>
                 <div className="absolute inset-0 opacity-10 dark:opacity-5" style={{
                     backgroundImage: 'linear-gradient(to right, #000000 1px, transparent 1px), linear-gradient(to bottom, #000000 1px, transparent 1px)',
                     backgroundSize: '40px 40px'
