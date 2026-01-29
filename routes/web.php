@@ -144,6 +144,13 @@ Route::middleware(['auth', SwitchTenantDatabase::class])->group(function () {
 		Route::post('/reviews', [TenantDepartmentManagerController::class, 'storeReview'])->name('reviews.store');
 	});
 
+	Route::get('/tenant/csrf-token', function () {
+		return response()->json([
+			'ok' => true,
+			'token' => csrf_token(),
+		]);
+	})->name('tenant.csrf');
+
 	Route::get('/tenant/wifi-check', function (Request $request) {
 		$policy = AttendancePolicy::where('is_active', true)->orderByDesc('id')->first();
 		$requiresCompanyWifi = (bool) optional($policy)->requires_company_wifi;
@@ -270,9 +277,8 @@ Route::middleware(['auth', SwitchTenantDatabase::class, EnsureCompanyAdmin::clas
 });
 
 // Show the form page (Inertia React)
-Route::get('/tenant/apply', function () {
-    return inertia('Apply');
-})->name('tenant.apply');
+Route::get('/tenant/apply', [TenantApplicationController::class, 'showApplyForm'])
+    ->name('tenant.apply');
 
 // Handle form submission (POST)
 Route::post('/tenant/apply', [TenantApplicationController::class, 'apply'])
