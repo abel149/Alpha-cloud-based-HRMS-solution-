@@ -11,7 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('attendance_logs', function (Blueprint $table) {
+        if (Schema::connection('Tenant')->hasTable('attendance_logs')) {
+            return;
+        }
+
+        Schema::connection('Tenant')->create('attendance_logs', function (Blueprint $table) {
             $table->id();
             $table->timestamps();
         });
@@ -22,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('attendance_logs');
+        Schema::connection('Tenant')->dropIfExists('attendance_logs');
     }
 };
