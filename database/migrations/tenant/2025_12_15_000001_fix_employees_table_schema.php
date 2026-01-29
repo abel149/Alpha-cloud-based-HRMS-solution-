@@ -16,11 +16,6 @@ return new class extends Migration
             if (!Schema::hasColumn('employees', 'department_id')) {
                 // We use unsignedBigInteger explicitly to avoid issues if foreign key constraint fails immediately
                 $table->unsignedBigInteger('department_id')->nullable()->after('user_id');
-                
-                // Try to add constraint if departments table exists
-                if (Schema::hasTable('departments')) {
-                    $table->foreign('department_id')->references('id')->on('departments')->onDelete('set null');
-                }
             }
 
             // Check and add other potential missing columns
@@ -43,6 +38,27 @@ return new class extends Migration
                 $table->binary('cv')->nullable()->after('status');
             }
         });
+
+        // Add foreign key after the table alteration so we can safely check the schema.
+        // This prevents provisioning failures when departments table is created later.
+        if (Schema::hasTable('employees') && Schema::hasColumn('employees', 'department_id') && Schema::hasTable('departments')) {
+            try {
+                Schema::table('employees', function (Blueprint $table) {
+                    try {
+                        $table->dropForeign(['department_id']);
+                    } catch (\Throwable $ignored) {
+                        // ignore if FK doesn't exist
+                    }
+
+                    $table->foreign('department_id')
+                        ->references('id')
+                        ->on('departments')
+                        ->onDelete('set null');
+                });
+            } catch (\Throwable $e) {
+                // ignore: some tenants may have a different schema state
+            }
+        }
     }
 
     /**
