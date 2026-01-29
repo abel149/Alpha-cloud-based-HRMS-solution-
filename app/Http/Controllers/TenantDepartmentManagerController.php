@@ -34,7 +34,17 @@ class TenantDepartmentManagerController extends Controller
             return null;
         }
 
-        return Department::where('manager_id', $manager->id)->orderByDesc('id')->first();
+        $byManagerId = Department::where('manager_id', $manager->id)->orderByDesc('id')->first();
+        if ($byManagerId) {
+            return $byManagerId;
+        }
+
+        $managerEmployee = Employee::where('user_id', $manager->id)->orderByDesc('id')->first();
+        if (!$managerEmployee?->department_id) {
+            return null;
+        }
+
+        return Department::where('id', $managerEmployee->department_id)->orderByDesc('id')->first();
     }
 
     public function teamOverview()

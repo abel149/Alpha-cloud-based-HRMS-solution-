@@ -9,10 +9,12 @@ use App\Models\AttendancePolicy;
 use App\Models\Role;
 use App\Models\Permission;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
@@ -63,31 +65,31 @@ class CompanyAdminController extends Controller
     public function index()
     {
         try {
-            $employees = Employee::with(['user', 'department'])->get();
+            $employees = Employee::with(['user', 'department'])->orderByDesc('id')->get();
         } catch (\Exception $e) {
             $employees = collect([]);
         }
 
         try {
-            $departments = Department::with('manager')->get();
+            $departments = Department::with('manager')->orderByDesc('id')->get();
         } catch (\Exception $e) {
             $departments = collect([]);
         }
 
         try {
-            $leavePolicies = LeavePolicy::all();
+            $leavePolicies = LeavePolicy::orderByDesc('id')->get();
         } catch (\Exception $e) {
             $leavePolicies = collect([]);
         }
 
         try {
-            $attendancePolicies = AttendancePolicy::all();
+            $attendancePolicies = AttendancePolicy::orderByDesc('id')->get();
         } catch (\Exception $e) {
             $attendancePolicies = collect([]);
         }
 
         try {
-            $roles = Role::with('permissions')->get();
+            $roles = Role::with('permissions')->orderByDesc('id')->get();
         } catch (\Exception $e) {
             $roles = collect([]);
         }
@@ -118,6 +120,18 @@ class CompanyAdminController extends Controller
 
     public function storeEmployee(Request $request)
     {
+        if ($request->input('department_id') === '') {
+            $request->merge(['department_id' => null]);
+        }
+
+        if ($request->input('phone') === '') {
+            $request->merge(['phone' => null]);
+        }
+
+        if ($request->input('salary') === '') {
+            $request->merge(['salary' => null]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             // email must be unique in both central and tenant users tables
@@ -125,7 +139,7 @@ class CompanyAdminController extends Controller
             'password' => 'required|min:8',
             'role' => 'required|in:hr_manager,finance_manager,department_manager,employee',
             // department belongs to Tenant DB
-            'department_id' => 'nullable|exists:Tenant.departments,id',
+            'department_id' => 'nullable|exists:Tenant.departments,id|required_if:role,department_manager',
             'hire_date' => 'required|date',
             'job_title' => 'required|string',
             // employees table is also on Tenant connection
@@ -144,28 +158,48 @@ class CompanyAdminController extends Controller
             'tenant_id' => auth()->user()->tenant_id, // same tenant as company admin
         ]);
 
-        // Create tenant-specific user + employee record
-        DB::connection('Tenant')->transaction(function () use ($request) {
-            $user = new User();
-            $user->setConnection('Tenant');
-            $user->name = $request->name;
-            $user->email = $request->email;
-            $user->password = Hash::make($request->password);
-            $user->role = $request->role;
-            $user->save();
-
-            Employee::create([
-                'user_id' => $user->id,
-                'department_id' => $request->department_id,
-                'hire_date' => $request->hire_date,
-                'job_title' => $request->job_title,
-                'employee_code' => $request->employee_code,
-                'phone' => $request->phone,
-                'salary' => $request->salary,
-                'employment_type' => $request->employment_type,
-                'status' => 'active',
+        try {
+            event(new Registered($centralUser));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send registration email', [
+                'user_id' => $centralUser->id,
+                'email' => $centralUser->email,
+                'message' => $e->getMessage(),
             ]);
-        });
+        }
+
+        // Create tenant-specific user + employee record
+        try {
+            DB::connection('Tenant')->transaction(function () use ($request) {
+                $user = new User();
+                $user->setConnection('Tenant');
+                $user->name = $request->name;
+                $user->email = $request->email;
+                $user->password = Hash::make($request->password);
+                $user->role = $request->role;
+                $user->save();
+
+                Employee::create([
+                    'user_id' => $user->id,
+                    'department_id' => $request->department_id,
+                    'hire_date' => $request->hire_date,
+                    'job_title' => $request->job_title,
+                    'employee_code' => $request->employee_code,
+                    'phone' => $request->phone,
+                    'salary' => $request->salary,
+                    'employment_type' => $request->employment_type,
+                    'status' => 'active',
+                ]);
+
+                if ($request->role === 'department_manager' && $request->department_id) {
+                    Department::where('manager_id', $user->id)->update(['manager_id' => null]);
+                    Department::where('id', $request->department_id)->update(['manager_id' => $user->id]);
+                }
+            });
+        } catch (\Throwable $e) {
+            $centralUser->delete();
+            throw $e;
+        }
 
         return back()->with('success', 'Employee created successfully');
     }
@@ -175,13 +209,25 @@ class CompanyAdminController extends Controller
         $employee = Employee::with('user')->findOrFail($id);
         $user = $employee->user;
 
+        if ($request->input('department_id') === '') {
+            $request->merge(['department_id' => null]);
+        }
+
+        if ($request->input('phone') === '') {
+            $request->merge(['phone' => null]);
+        }
+
+        if ($request->input('salary') === '') {
+            $request->merge(['salary' => null]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             // unique email in both Tenant and central users tables, excluding current user
             'email' => 'required|email|unique:users,email,' . ($user?->email ?? 'NULL') . ',email|unique:Tenant.users,email,' . ($user?->id ?? 'NULL') . ',id',
             'password' => 'nullable|min:8',
             'role' => 'required|in:hr_manager,finance_manager,department_manager,employee',
-            'department_id' => 'nullable|exists:Tenant.departments,id',
+            'department_id' => 'nullable|exists:Tenant.departments,id|required_if:role,department_manager',
             'hire_date' => 'required|date',
             'job_title' => 'required|string',
             'employee_code' => 'required|string|unique:Tenant.employees,employee_code,' . $employee->id,
@@ -202,6 +248,17 @@ class CompanyAdminController extends Controller
                 $user->save();
             }
 
+            $centralUser = \App\Models\User::where('email', $employee?->user?->email)->first();
+            if ($centralUser) {
+                $centralUser->name = $request->name;
+                $centralUser->email = $request->email;
+                if ($request->filled('password')) {
+                    $centralUser->password = Hash::make($request->password);
+                }
+                $centralUser->role = $request->role;
+                $centralUser->save();
+            }
+
             $employee->update([
                 'department_id' => $request->department_id,
                 'hire_date' => $request->hire_date,
@@ -211,6 +268,15 @@ class CompanyAdminController extends Controller
                 'salary' => $request->salary,
                 'employment_type' => $request->employment_type,
             ]);
+
+            if ($user) {
+                if ($request->role === 'department_manager' && $request->department_id) {
+                    Department::where('manager_id', $user->id)->update(['manager_id' => null]);
+                    Department::where('id', $request->department_id)->update(['manager_id' => $user->id]);
+                } else {
+                    Department::where('manager_id', $user->id)->update(['manager_id' => null]);
+                }
+            }
         });
 
         return back()->with('success', 'Employee updated successfully');
@@ -456,10 +522,11 @@ class CompanyAdminController extends Controller
     public function storeRole(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|unique:roles,name',
+            'name' => 'required|string|unique:Tenant.roles,name',
             'display_name' => 'required|string',
             'description' => 'nullable|string',
             'permissions' => 'array',
+            'permissions.*' => 'integer|exists:Tenant.permissions,id',
         ]);
 
         $role = Role::create($request->except('permissions'));
@@ -476,10 +543,11 @@ class CompanyAdminController extends Controller
         $role = Role::findOrFail($id);
 
         $request->validate([
-            'name' => 'required|string|unique:roles,name,' . $role->id,
+            'name' => 'required|string|unique:Tenant.roles,name,' . $role->id,
             'display_name' => 'required|string',
             'description' => 'nullable|string',
             'permissions' => 'array',
+            'permissions.*' => 'integer|exists:Tenant.permissions,id',
         ]);
 
         $role->update($request->except('permissions'));

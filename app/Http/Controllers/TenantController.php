@@ -13,6 +13,8 @@ use Inertia\Inertia;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use App\Notifications\CompanyAdminCredentialsNotification;
+use Illuminate\Support\Facades\Notification;
 
 
 class TenantController extends Controller
@@ -120,7 +122,7 @@ class TenantController extends Controller
     public function index()
     {
         // Fetch tenants
-        $tenants = Tenant::all();
+        $tenants = Tenant::orderByDesc('id')->get();
 
         // Fetch tenant applications that have completed payment but are not yet provisioned as tenants
         // (tenant_created is either NULL or explicitly 0)
@@ -129,12 +131,13 @@ class TenantController extends Controller
                 $q->whereNull('tenant_created')
                   ->orWhere('tenant_created', 0);
             })
+            ->orderByDesc('id')
             ->get();
 
         // Fetch all subscription plans
-        $subscriptionPlans = SubscriptionPlan::all();
+        $subscriptionPlans = SubscriptionPlan::orderByDesc('id')->get();
         //Fetch users
-        $compadmin = User::all();
+        $compadmin = User::orderByDesc('id')->get();
 
         return Inertia::render('SuperAdmin/Tenants/Index', [
             'tenants' => $tenants,
@@ -157,9 +160,41 @@ class TenantController extends Controller
 
     public function destroy(Tenant $tenant)
     {
-        $tenant->delete();
+        $dbName = (string) $tenant->database;
 
-        return redirect()->route('tenants.index')->with('success', 'Tenant deleted successfully!');
+        if ($dbName === '' || !preg_match('/^[A-Za-z0-9_]+$/', $dbName)) {
+            return back()->with('error', 'Failed to delete tenant. Invalid tenant database name.');
+        }
+
+        try {
+            try {
+                DB::disconnect('Tenant');
+                DB::purge('Tenant');
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            $existingDb = DB::select(
+                "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
+                [$dbName]
+            );
+
+            if (count($existingDb) > 0) {
+                DB::statement("DROP DATABASE `$dbName`");
+            }
+
+            $tenant->delete();
+
+            return redirect()->route('tenants.index')->with('success', 'Tenant deleted successfully!');
+        } catch (\Throwable $e) {
+            Log::error('Tenant deletion error', [
+                'tenant_id' => $tenant->id,
+                'database' => $dbName,
+                'message' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Failed to delete tenant database. Please ensure no active connections are using it and try again.');
+        }
     }
 
     public function create()
@@ -173,23 +208,45 @@ class TenantController extends Controller
     }
     public function storeuser(Request $request)
     {
-        $request->validate([
-            'tenantid' => 'nullable|integer',
-            'name' => 'required|string',
-            'email' => 'required|email',
-            'password' => 'required|min:6',
-            'role' => 'nullable|string',
+        $request->merge([
+            'email' => strtolower(trim((string) $request->email)),
         ]);
 
-        User::create([
+        $request->validate([
+            'tenantid' => 'required|integer|exists:tenants,id',
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users,email',
+        ]);
+
+        $tenantId = (int) $request->tenantid;
+        $tempPasswordPlain = (string) \Illuminate\Support\Str::random(12);
+        $tempPasswordHashed = Hash::make($tempPasswordPlain);
+
+        $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'tenant_id' => $request->tenantid, // stays central
+            'password' => $tempPasswordHashed,
+            'role' => 'company_admin',
+            'tenant_id' => $tenantId, // stays central
         ]);
 
-        return back()->with('success', 'User created successfully');
+        try {
+            Notification::route('mail', $user->email)->notify(new CompanyAdminCredentialsNotification(
+                tenantId: $tenantId,
+                tempPassword: $tempPasswordPlain,
+            ));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send company admin credentials email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'tenant_id' => $tenantId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Company Admin created but email could not be sent. Please check mail settings (SMTP) and try again.');
+        }
+
+        return back()->with('success', 'Company Admin created and credentials emailed successfully');
     }
     public function storeSubscriptionPlan(Request $request)
     {
