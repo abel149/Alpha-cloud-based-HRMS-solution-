@@ -149,27 +149,19 @@ class CompanyAdminController extends Controller
             'employment_type' => 'required|in:full_time,part_time,contract,intern',
         ]);
 
-        // Create central user for authentication (uses default connection)
-        $centralUser = \App\Models\User::create([
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'password'  => Hash::make($request->password),
-            'role'      => $request->role,
-            'tenant_id' => auth()->user()->tenant_id, // same tenant as company admin
-        ]);
+        $centralUser = null;
 
         try {
-            event(new Registered($centralUser));
-        } catch (\Throwable $e) {
-            Log::error('Failed to send registration email', [
-                'user_id' => $centralUser->id,
-                'email' => $centralUser->email,
-                'message' => $e->getMessage(),
+            // Create central user for authentication (uses default connection)
+            $centralUser = \App\Models\User::create([
+                'name'      => $request->name,
+                'email'     => $request->email,
+                'password'  => Hash::make($request->password),
+                'role'      => $request->role,
+                'tenant_id' => auth()->user()->tenant_id, // same tenant as company admin
             ]);
-        }
 
-        // Create tenant-specific user + employee record
-        try {
+            // Create tenant-specific user + employee record
             DB::connection('Tenant')->transaction(function () use ($request) {
                 $user = new User();
                 $user->setConnection('Tenant');
@@ -196,12 +188,26 @@ class CompanyAdminController extends Controller
                     Department::where('id', $request->department_id)->update(['manager_id' => $user->id]);
                 }
             });
-        } catch (\Throwable $e) {
-            $centralUser->delete();
-            throw $e;
-        }
 
-        return back()->with('success', 'Employee created successfully');
+            return back()->with('success', 'Employee created successfully');
+        } catch (\Throwable $e) {
+            if ($centralUser) {
+                try {
+                    $centralUser->delete();
+                } catch (\Throwable $ignored) {
+                }
+            }
+
+            Log::error('Failed to create employee', [
+                'message' => $e->getMessage(),
+                'tenant_id' => auth()->user()->tenant_id,
+                'email' => $request->email,
+            ]);
+
+            return back()->withErrors([
+                'error' => 'Failed to create employee. ' . $e->getMessage(),
+            ]);
+        }
     }
 
     public function updateEmployee(Request $request, $id)
@@ -236,50 +242,61 @@ class CompanyAdminController extends Controller
             'employment_type' => 'required|in:full_time,part_time,contract,intern',
         ]);
 
-        DB::connection('Tenant')->transaction(function () use ($request, $employee, $user) {
-            if ($user) {
-                $user->setConnection('Tenant');
-                $user->name = $request->name;
-                $user->email = $request->email;
-                if ($request->filled('password')) {
-                    $user->password = Hash::make($request->password);
+        try {
+            DB::connection('Tenant')->transaction(function () use ($request, $employee, $user) {
+                if ($user) {
+                    $user->setConnection('Tenant');
+                    $user->name = $request->name;
+                    $user->email = $request->email;
+                    if ($request->filled('password')) {
+                        $user->password = Hash::make($request->password);
+                    }
+                    $user->role = $request->role;
+                    $user->save();
                 }
-                $user->role = $request->role;
-                $user->save();
-            }
 
-            $centralUser = \App\Models\User::where('email', $employee?->user?->email)->first();
-            if ($centralUser) {
-                $centralUser->name = $request->name;
-                $centralUser->email = $request->email;
-                if ($request->filled('password')) {
-                    $centralUser->password = Hash::make($request->password);
+                $centralUser = \App\Models\User::where('email', $employee?->user?->email)->first();
+                if ($centralUser) {
+                    $centralUser->name = $request->name;
+                    $centralUser->email = $request->email;
+                    if ($request->filled('password')) {
+                        $centralUser->password = Hash::make($request->password);
+                    }
+                    $centralUser->role = $request->role;
+                    $centralUser->save();
                 }
-                $centralUser->role = $request->role;
-                $centralUser->save();
-            }
 
-            $employee->update([
-                'department_id' => $request->department_id,
-                'hire_date' => $request->hire_date,
-                'job_title' => $request->job_title,
-                'employee_code' => $request->employee_code,
-                'phone' => $request->phone,
-                'salary' => $request->salary,
-                'employment_type' => $request->employment_type,
+                $employee->update([
+                    'department_id' => $request->department_id,
+                    'hire_date' => $request->hire_date,
+                    'job_title' => $request->job_title,
+                    'employee_code' => $request->employee_code,
+                    'phone' => $request->phone,
+                    'salary' => $request->salary,
+                    'employment_type' => $request->employment_type,
+                ]);
+
+                if ($user) {
+                    if ($request->role === 'department_manager' && $request->department_id) {
+                        Department::where('manager_id', $user->id)->update(['manager_id' => null]);
+                        Department::where('id', $request->department_id)->update(['manager_id' => $user->id]);
+                    } else {
+                        Department::where('manager_id', $user->id)->update(['manager_id' => null]);
+                    }
+                }
+            });
+
+            return back()->with('success', 'Employee updated successfully');
+        } catch (\Throwable $e) {
+            Log::error('Failed to update employee', [
+                'employee_id' => $employee->id,
+                'message' => $e->getMessage(),
             ]);
 
-            if ($user) {
-                if ($request->role === 'department_manager' && $request->department_id) {
-                    Department::where('manager_id', $user->id)->update(['manager_id' => null]);
-                    Department::where('id', $request->department_id)->update(['manager_id' => $user->id]);
-                } else {
-                    Department::where('manager_id', $user->id)->update(['manager_id' => null]);
-                }
-            }
-        });
-
-        return back()->with('success', 'Employee updated successfully');
+            return back()->withErrors([
+                'error' => 'Failed to update employee. ' . $e->getMessage(),
+            ]);
+        }
     }
 
     public function destroyEmployee($id)
