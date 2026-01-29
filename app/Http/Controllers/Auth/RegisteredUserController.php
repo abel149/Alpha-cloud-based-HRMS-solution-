@@ -78,6 +78,6 @@ class RegisteredUserController extends Controller
         // Step 4: Event & redirect
         event(new Registered($user));
 
-        return redirect(route('login', absolute: false));
+        return redirect()->to('/?modal=login');
     }
 }

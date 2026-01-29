@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Notifications\PasswordChangedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 
 class PasswordController extends Controller
@@ -23,6 +25,19 @@ class PasswordController extends Controller
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+
+        try {
+            $request->user()->notify(new PasswordChangedNotification(
+                ipAddress: $request->ip(),
+                userAgent: $request->userAgent(),
+            ));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send password changed email', [
+                'user_id' => $request->user()->id,
+                'email' => $request->user()->email,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return back();
     }
