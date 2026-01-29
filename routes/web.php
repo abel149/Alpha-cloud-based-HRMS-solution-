@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
 // -------------------
 // Tenant Routes (role-based dashboards)
 // -------------------
-Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
+Route::middleware(['auth', SwitchTenantDatabase::class])->group(function () {
 	Route::get('/tenant-dashboard', function () {
 		$user = Auth::user();
 
@@ -118,9 +118,13 @@ Route::middleware([SwitchTenantDatabase::class, 'auth'])->group(function () {
 		Route::get('/settings', [TenantFinanceController::class, 'getFinanceSettings'])->name('settings.get');
 		Route::post('/settings', [TenantFinanceController::class, 'updateFinanceSettings'])->name('settings.update');
 		Route::get('/employees', [TenantFinanceController::class, 'listEmployees'])->name('employees.index');
+		Route::post('/payroll/preview', [TenantFinanceController::class, 'previewMonthlyPayroll'])->name('payroll.preview');
 		Route::get('/payroll/runs', [TenantFinanceController::class, 'listPayrollRuns'])->name('payroll.runs.index');
 		Route::get('/payroll/runs/{id}', [TenantFinanceController::class, 'showPayrollRun'])->name('payroll.runs.show');
 		Route::post('/payroll/run', [TenantFinanceController::class, 'runMonthlyPayroll'])->name('payroll.run');
+		Route::post('/payroll/runs/{id}/recalculate', [TenantFinanceController::class, 'recalculatePayrollRun'])->name('payroll.runs.recalculate');
+		Route::post('/payroll/runs/{id}/finalize', [TenantFinanceController::class, 'finalizePayrollRun'])->name('payroll.runs.finalize');
+		Route::get('/payroll/runs/{id}/print', [TenantFinanceController::class, 'printPayrollRun'])->name('payroll.runs.print');
 		Route::get('/payroll/runs/{id}/export', [TenantFinanceController::class, 'exportPayrollRunCsv'])->name('payroll.runs.export');
 		Route::get('/adjustments', [TenantFinanceController::class, 'listAdjustments'])->name('adjustments.index');
 		Route::post('/adjustments', [TenantFinanceController::class, 'storeAdjustment'])->name('adjustments.store');
@@ -233,7 +237,7 @@ Route::middleware(['auth', EnsureSuperAdmin::class])->group(function () {
 // -------------------
 // Company Admin Routes (Tenant-specific)
 // -------------------
-Route::middleware([SwitchTenantDatabase::class, 'auth', EnsureCompanyAdmin::class])->prefix('company-admin')->name('company-admin.')->group(function () {
+Route::middleware(['auth', SwitchTenantDatabase::class, EnsureCompanyAdmin::class])->prefix('company-admin')->name('company-admin.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [CompanyAdminController::class, 'index'])->name('dashboard');
 
@@ -299,7 +303,7 @@ Route::post('/subscription-plans', [TenantController::class, 'storeSubscriptionP
 //create user 
 Route::post('/users', [TenantController::class, 'storeuser'])
     ->name('users.store')
-    ->middleware(['auth']); // only accessible to logged-in Super Admin
+    ->middleware(['auth', EnsureSuperAdmin::class]); // only accessible to logged-in Super Admin
 
 // Default Dashboard - Role-based redirect (NO OLD DASHBOARD PAGE)
 // -------------------
@@ -321,6 +325,6 @@ Route::get('/dashboard', function () {
 
     // No dashboard access - redirect to home
     return redirect('/');
-})->middleware([SwitchTenantDatabase::class, 'auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', SwitchTenantDatabase::class])->name('dashboard');
 
 require __DIR__ . '/auth.php';
