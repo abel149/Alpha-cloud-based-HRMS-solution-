@@ -7,21 +7,15 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class AuthenticatedSessionController extends Controller
 {
     /**
      * Display the login view.
      */
-    public function create(): Response
+    public function create(): RedirectResponse
     {
-        return Inertia::render('Auth/Login', [
-            'canResetPassword' => Route::has('password.request'),
-            'status' => session('status'),
-        ]);
+        return redirect()->to('/?modal=login');
     }
 
     /**
@@ -37,7 +31,7 @@ class AuthenticatedSessionController extends Controller
         
         if (!$user) {
             Auth::logout();
-            return redirect()->route('login')->withErrors([
+            return redirect()->to('/?modal=login')->withErrors([
                 'email' => 'Authentication failed. Please try again.',
             ]);
         }
@@ -51,7 +45,7 @@ class AuthenticatedSessionController extends Controller
         if ($user->role === 'company_admin') {
             if (!$user->tenant_id) {
                 Auth::logout();
-                return redirect()->route('login')->withErrors([
+                return redirect()->to('/?modal=login')->withErrors([
                     'email' => 'Your account is not assigned to a tenant. Please contact the administrator.',
                 ]);
             }
@@ -67,7 +61,7 @@ class AuthenticatedSessionController extends Controller
         
         // No valid tenant - logout and show error
         Auth::logout();
-        return redirect()->route('login')->withErrors([
+        return redirect()->to('/?modal=login')->withErrors([
             'email' => 'Your account is not properly configured. Please contact the administrator.',
         ]);
     }
