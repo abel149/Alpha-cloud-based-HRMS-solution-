@@ -6,7 +6,16 @@ import UpdateProfileInformationForm from './Partials/UpdateProfileInformationFor
 import { useState } from 'react';
 import { FiHome, FiUser, FiLock, FiTrash2, FiChevronRight, FiShield, FiArrowLeft } from 'react-icons/fi';
 export default function Edit({ mustVerifyEmail, status, auth }) {
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tab = params.get('tab');
+            if (tab === 'password' || tab === 'profile' || tab === 'delete') {
+                return tab;
+            }
+        }
+        return 'dashboard';
+    });
     const { user } = auth;
 
     const backHref = user?.role === 'Super_admin'

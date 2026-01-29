@@ -23,6 +23,9 @@ export default function FinanceDashboard({ user, tenant_db }) {
     const [warning, setWarning] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [payrollPreview, setPayrollPreview] = useState(null);
+    const [payrollPreviewLoading, setPayrollPreviewLoading] = useState(false);
+
     const now = new Date();
     const [payrollForm, setPayrollForm] = useState({
         month: String(now.getMonth() + 1),
@@ -123,6 +126,9 @@ export default function FinanceDashboard({ user, tenant_db }) {
         const method = (options.method || 'GET').toUpperCase();
         const isJsonBody = options.body && typeof options.body === 'string';
 
+        const csrf = csrfToken();
+        const xsrf = xsrfTokenFromCookie();
+
         const res = await fetch(normalizeSameOriginUrl(url), {
             ...options,
             method,
@@ -131,8 +137,8 @@ export default function FinanceDashboard({ user, tenant_db }) {
                 Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
                 ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
-                ...(csrfToken() ? { 'X-CSRF-TOKEN': csrfToken() } : {}),
-                ...(xsrfTokenFromCookie() ? { 'X-XSRF-TOKEN': xsrfTokenFromCookie() } : {}),
+                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+                ...(!xsrf && csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
                 ...(options.headers || {}),
             },
         });
@@ -263,7 +269,31 @@ export default function FinanceDashboard({ user, tenant_db }) {
         return () => { cancelled = true; };
     }, []);
 
-    const runPayroll = async (e) => {
+    const previewPayroll = async (e) => {
+        e.preventDefault();
+        setPayrollPreviewLoading(true);
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await fetchJson(route('tenant.finance.payroll.preview'), {
+                method: 'POST',
+                body: JSON.stringify({
+                    month: Number(payrollForm.month),
+                    year: Number(payrollForm.year),
+                }),
+            });
+            setPayrollPreview(data || null);
+            setSuccess('Preview ready');
+        } catch (e2) {
+            setError(e2?.message || 'Failed to run payroll');
+        } finally {
+            setLoading(false);
+            setPayrollPreviewLoading(false);
+        }
+    };
+
+    const createDraftPayroll = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
@@ -276,7 +306,8 @@ export default function FinanceDashboard({ user, tenant_db }) {
                     year: Number(payrollForm.year),
                 }),
             });
-            setSuccess('Payroll generated successfully');
+            setSuccess('Draft payroll run created');
+            setPayrollPreview(null);
             if (data?.payroll) {
                 setPayrollRuns((prev) => [data.payroll, ...(prev || [])]);
             } else {
@@ -284,7 +315,62 @@ export default function FinanceDashboard({ user, tenant_db }) {
             }
             await loadAuditReport();
         } catch (e2) {
-            setError(e2?.message || 'Failed to run payroll');
+            setError(e2?.message || 'Failed to create payroll run');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const recalculateRun = async (runId) => {
+        if (!runId) return;
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await fetchJson(route('tenant.finance.payroll.runs.recalculate', runId), {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            setSuccess('Draft payroll recalculated');
+            if (data?.payroll) {
+                setPayrollRuns((prev) => (prev || []).map((r) => (String(r.id) === String(runId) ? data.payroll : r)));
+                if (runDetails?.id && String(runDetails.id) === String(runId)) {
+                    setRunDetails(data.payroll);
+                    await openRunDetails(data.payroll);
+                }
+            } else {
+                await loadPayrollRuns();
+            }
+            await loadAuditReport();
+        } catch (e2) {
+            setError(e2?.message || 'Failed to recalculate');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const finalizeRun = async (runId) => {
+        if (!runId) return;
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await fetchJson(route('tenant.finance.payroll.runs.finalize', runId), {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            setSuccess('Payroll finalized');
+            if (data?.payroll) {
+                setPayrollRuns((prev) => (prev || []).map((r) => (String(r.id) === String(runId) ? data.payroll : r)));
+                if (runDetails?.id && String(runDetails.id) === String(runId)) {
+                    setRunDetails(data.payroll);
+                }
+            } else {
+                await loadPayrollRuns();
+            }
+            await loadAuditReport();
+        } catch (e2) {
+            setError(e2?.message || 'Failed to finalize');
         } finally {
             setLoading(false);
         }
@@ -412,9 +498,16 @@ export default function FinanceDashboard({ user, tenant_db }) {
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 lg:col-span-3">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Logged in as</p>
-                        <p className="text-lg font-semibold">{user?.name} <span className="text-sm text-gray-500 dark:text-gray-400">({user?.role})</span></p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Tenant DB: {tenant_db}</p>
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Welcome back</p>
+                                <p className="text-lg font-semibold text-gray-900 dark:text-white">{user?.name || 'User'}</p>
+                            </div>
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-800">
+                                Finance Manager
+                            </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Run payroll, manage adjustments, and review reports.</p>
                     </div>
                 </div>
 
@@ -423,7 +516,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                         <input
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                             placeholder="Search payrolls, adjustments..."
                         />
                     </div>
@@ -477,18 +570,18 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                     <div className="flex items-center justify-between gap-4 flex-wrap">
                                         <div>
-                                            <h3 className="text-lg font-semibold">Run Monthly Payroll</h3>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Generates payroll based on employee salary and saved adjustments for the selected month.</p>
+                                            <h3 className="text-lg font-semibold">Monthly Payroll Workflow</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Preview payroll, create a draft run, apply corrections/adjustments, then finalize and export. Weekends are excluded. Approved leave is handled using leave policy paid/unpaid rules.</p>
                                         </div>
                                     </div>
 
-                                    <form onSubmit={runPayroll} className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                                    <form onSubmit={previewPayroll} className="mt-5 grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Month</label>
                                             <input
                                                 value={payrollForm.month}
                                                 onChange={(e) => setPayrollForm((p) => ({ ...p, month: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="1"
                                                 max="12"
@@ -500,22 +593,95 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={payrollForm.year}
                                                 onChange={(e) => setPayrollForm((p) => ({ ...p, year: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="2000"
                                                 max="2100"
                                                 required
                                             />
                                         </div>
-                                        <div className="md:col-span-3">
+                                        <div className="md:col-span-4 flex flex-wrap gap-2">
                                             <button
-                                                disabled={loading}
+                                                disabled={loading || payrollPreviewLoading}
                                                 className="w-full md:w-auto inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg shadow-sm hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60"
                                             >
-                                                <FiPlus className="mr-2" /> {loading ? 'Working...' : 'Generate Payroll'}
+                                                <FiFileText className="mr-2" /> {payrollPreviewLoading ? 'Previewing...' : 'Preview Payroll'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={loading}
+                                                onClick={createDraftPayroll}
+                                                className="w-full md:w-auto inline-flex items-center px-4 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 disabled:opacity-60"
+                                            >
+                                                <FiPlus className="mr-2" /> Create Draft Run
                                             </button>
                                         </div>
                                     </form>
+
+                                    {payrollPreview?.ok && (
+                                        <div className="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                                    <div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">Preview for</div>
+                                                        <div className="text-lg font-semibold">{payrollPreview?.period}</div>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                            Rates used: tax {payrollPreview?.settings?.tax_rate_percent ?? 0}% • deductions {payrollPreview?.settings?.deduction_rate_percent ?? 0}%
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-3 flex-wrap">
+                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Employees</div>
+                                                            <div className="font-semibold">{payrollPreview?.employees_count ?? '-'}</div>
+                                                        </div>
+                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Total Gross</div>
+                                                            <div className="font-semibold">{payrollPreview?.totals?.total_gross ?? '0.00'}</div>
+                                                        </div>
+                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Attendance Deductions</div>
+                                                            <div className="font-semibold">{payrollPreview?.totals?.total_attendance_deductions ?? '0.00'}</div>
+                                                        </div>
+                                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400">Total Net</div>
+                                                            <div className="font-semibold">{payrollPreview?.totals?.total_net ?? '0.00'}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="min-w-full">
+                                                    <thead className="bg-white dark:bg-gray-800">
+                                                        <tr>
+                                                            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Employee</th>
+                                                            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Gross</th>
+                                                            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Attendance Deduction</th>
+                                                            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax</th>
+                                                            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deductions</th>
+                                                            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                                                        {(Array.isArray(payrollPreview?.items) ? payrollPreview.items.slice(0, 50) : []).map((it) => (
+                                                            <tr key={it.employee_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                                                <td className="px-4 py-3 text-sm font-medium">{it.employee_name || `Employee #${it.employee_id}`}</td>
+                                                                <td className="px-4 py-3 text-sm">{it.gross ?? '0.00'}</td>
+                                                                <td className="px-4 py-3 text-sm">{it.attendance_deduction ?? '0.00'}</td>
+                                                                <td className="px-4 py-3 text-sm">{it.tax_total ?? '0.00'}</td>
+                                                                <td className="px-4 py-3 text-sm">{it.deduction_total ?? '0.00'}</td>
+                                                                <td className="px-4 py-3 text-sm">{it.net ?? '0.00'}</td>
+                                                            </tr>
+                                                        ))}
+                                                        {(Array.isArray(payrollPreview?.items) ? payrollPreview.items.length : 0) > 50 && (
+                                                            <tr>
+                                                                <td colSpan="6" className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">Showing first 50 employees in preview.</td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -536,7 +702,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                     <th className="text-right px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                                                 {filteredPayrollRuns.map((r) => (
                                                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                         <td className="px-6 py-4 text-sm font-medium">{String(r.year).padStart(4, '0')}-{String(r.month).padStart(2, '0')}</td>
@@ -555,6 +721,13 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                             </button>
                                                             <button
                                                                 type="button"
+                                                                onClick={() => downloadUrl(route('tenant.finance.payroll.runs.print', r.id))}
+                                                                className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 mr-2"
+                                                            >
+                                                                Print
+                                                            </button>
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => downloadUrl(route('tenant.finance.payroll.runs.export', r.id))}
                                                                 className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                             >
@@ -570,73 +743,96 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                 )}
                                             </tbody>
                                         </table>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {runDetailsOpen && (
-                                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                                        <div className="absolute inset-0 bg-black/50" onClick={() => setRunDetailsOpen(false)} />
-                                        <div className="relative w-full max-w-5xl bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                                                <div>
-                                                    <div className="text-lg font-bold">Payroll Run Details</div>
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                                        {runDetails ? `${String(runDetails.year).padStart(4, '0')}-${String(runDetails.month).padStart(2, '0')} • Run #${runDetails.id}` : 'Loading…'}
+                                    {runDetailsOpen && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                            <div className="absolute inset-0 bg-black/50" onClick={() => setRunDetailsOpen(false)} />
+                                            <div className="relative w-full max-w-5xl bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-lg font-bold">Payroll Run Details</div>
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {runDetails ? `${String(runDetails.year).padStart(4, '0')}-${String(runDetails.month).padStart(2, '0')} • Run #${runDetails.id}` : 'Loading…'}
+                                                        </div>
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setRunDetailsOpen(false)}
+                                                        className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    >
+                                                        <FiX />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRunDetailsOpen(false)}
-                                                    className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                >
-                                                    <FiX />
-                                                </button>
-                                            </div>
 
-                                            <div className="p-6">
-                                                {runDetailsLoading && (
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">Loading payroll items…</div>
-                                                )}
+                                                <div className="p-6">
+                                                    {runDetailsLoading && (
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">Loading payroll items…</div>
+                                                    )}
 
-                                                {!runDetailsLoading && (
-                                                    <div className="overflow-x-auto">
-                                                        <table className="min-w-full">
-                                                            <thead className="bg-gray-50 dark:bg-gray-900/50">
-                                                                <tr>
-                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Employee</th>
-                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Gross</th>
-                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bonus</th>
-                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deductions</th>
-                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax</th>
-                                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                                {runDetailsItems.map((it) => (
-                                                                    <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                                                        <td className="px-4 py-3 text-sm">
-                                                                            <div className="font-medium">{it?.employee?.user?.name || `Employee #${it.employee_id}`}</div>
-                                                                            <div className="text-xs text-gray-500 dark:text-gray-400">{it?.employee?.user?.email || ''}</div>
-                                                                        </td>
-                                                                        <td className="px-4 py-3 text-sm">{it.gross}</td>
-                                                                        <td className="px-4 py-3 text-sm">{it.bonus_total ?? '0.00'}</td>
-                                                                        <td className="px-4 py-3 text-sm">{it.deduction_total ?? '0.00'}</td>
-                                                                        <td className="px-4 py-3 text-sm">{it.tax_total ?? '0.00'}</td>
-                                                                        <td className="px-4 py-3 text-sm">{it.net}</td>
-                                                                    </tr>
-                                                                ))}
-                                                                {!runDetailsLoading && runDetailsItems.length === 0 && (
+                                                    {!runDetailsLoading && (
+                                                        <div className="overflow-x-auto">
+                                                            <table className="min-w-full">
+                                                                <thead className="bg-gray-50 dark:bg-gray-900/50">
                                                                     <tr>
-                                                                        <td colSpan="6" className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No payroll items found for this run.</td>
+                                                                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Employee</th>
+                                                                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Gross</th>
+                                                                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Attendance</th>
+                                                                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deductions</th>
+                                                                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax</th>
+                                                                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net</th>
                                                                     </tr>
-                                                                )}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                                                                    {runDetailsItems.map((it) => (
+                                                                        <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                                                            <td className="px-4 py-3 text-sm">
+                                                                                {it?.employee?.user?.name || `Employee #${it.employee_id}`}
+                                                                            </td>
+                                                                            <td className="px-4 py-3 text-sm">{it.gross ?? it.gross_total ?? it.total_gross ?? '-'}</td>
+                                                                            <td className="px-4 py-3 text-sm">{it.attendance_deduction ?? '0.00'}</td>
+                                                                            <td className="px-4 py-3 text-sm">{it.deduction_total ?? '-'}</td>
+                                                                            <td className="px-4 py-3 text-sm">{it.tax_total ?? it.total_tax ?? '0.00'}</td>
+                                                                            <td className="px-4 py-3 text-sm">{it.net ?? it.total_net ?? '-'}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                    {!runDetailsLoading && runDetailsItems.length === 0 && (
+                                                                        <tr>
+                                                                            <td colSpan="6" className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No payroll items found for this run.</td>
+                                                                        </tr>
+                                                                    )}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
                                                 )}
                                             </div>
 
                                             <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                                                {runDetails?.id && String(runDetails?.status) === 'draft' && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            disabled={loading}
+                                                            onClick={() => recalculateRun(runDetails.id)}
+                                                            className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
+                                                        >
+                                                            Recalculate
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={loading}
+                                                            onClick={() => {
+                                                                if (window.confirm('Finalize this payroll run? This will lock the run.')) {
+                                                                    finalizeRun(runDetails.id);
+                                                                }
+                                                            }}
+                                                            className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-sm hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60"
+                                                        >
+                                                            Finalize
+                                                        </button>
+                                                    </>
+                                                )}
                                                 {runDetails?.id && (
                                                     <button
                                                         type="button"
@@ -644,6 +840,15 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                         className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                     >
                                                         <FiDownload className="mr-2" /> Export CSV
+                                                    </button>
+                                                )}
+                                                {runDetails?.id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => downloadUrl(route('tenant.finance.payroll.runs.print', runDetails.id))}
+                                                        className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                    >
+                                                        Print / PDF
                                                     </button>
                                                 )}
                                                 <button
@@ -725,7 +930,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={settingsForm.tax_rate_percent}
                                                 onChange={(e) => setSettingsForm((p) => ({ ...p, tax_rate_percent: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="0"
                                                 max="100"
@@ -738,7 +943,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={settingsForm.deduction_rate_percent}
                                                 onChange={(e) => setSettingsForm((p) => ({ ...p, deduction_rate_percent: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="0"
                                                 max="100"
@@ -771,7 +976,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <select
                                                 value={adjustmentForm.employee_id}
                                                 onChange={(e) => setAdjustmentForm((p) => ({ ...p, employee_id: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 required
                                             >
                                                 <option value="">Select employee...</option>
@@ -786,7 +991,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={adjustmentForm.month}
                                                 onChange={(e) => setAdjustmentForm((p) => ({ ...p, month: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="1"
                                                 max="12"
@@ -798,7 +1003,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={adjustmentForm.year}
                                                 onChange={(e) => setAdjustmentForm((p) => ({ ...p, year: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="2000"
                                                 max="2100"
@@ -810,7 +1015,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <select
                                                 value={adjustmentForm.type}
                                                 onChange={(e) => setAdjustmentForm((p) => ({ ...p, type: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 required
                                             >
                                                 <option value="deduction">Deduction</option>
@@ -823,7 +1028,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={adjustmentForm.amount}
                                                 onChange={(e) => setAdjustmentForm((p) => ({ ...p, amount: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
@@ -835,7 +1040,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                             <input
                                                 value={adjustmentForm.description}
                                                 onChange={(e) => setAdjustmentForm((p) => ({ ...p, description: e.target.value }))}
-                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900"
+                                                className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                                 placeholder={selectedEmployee ? `Adjustment for ${selectedEmployee?.user?.name}` : 'Reason / note'}
                                             />
                                         </div>
@@ -867,7 +1072,7 @@ export default function FinanceDashboard({ user, tenant_db }) {
                                                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Description</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                                                 {filteredAdjustments.map((a) => (
                                                     <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                                         <td className="px-6 py-4 text-sm font-medium">{a?.employee?.user?.name || `Employee #${a.employee_id}`}</td>

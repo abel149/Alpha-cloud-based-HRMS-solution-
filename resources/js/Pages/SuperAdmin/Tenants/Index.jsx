@@ -41,8 +41,20 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
     const [usersPage, setUsersPage] = useState(1);
     const [usersPageSize, setUsersPageSize] = useState(10);
 
+    const [provisioningAppIds, setProvisioningAppIds] = useState(new Set());
+
     // Get authenticated user data from props
     const user = auth?.user || {};
+
+    const flashSuccess = auth?.flash?.success;
+    const flashError = auth?.flash?.error;
+
+    const formatDateTime = (v) => {
+        if (!v) return '';
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return d.toLocaleString();
+    };
 
     // Function to get user initials
     const getInitials = (name) => {
@@ -72,10 +84,9 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
         tenantid: "",
         name: "",
         email: "",
-        password: "",
-        password_confirmation: "",
-        role: "",
     });
+
+    const [userSubmitting, setUserSubmitting] = useState(false);
 
     const [editingTenant, setEditingTenant] = useState(null);
     const [editTenantForm, setEditTenantForm] = useState({
@@ -93,11 +104,18 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
         Inertia.post("/superadmin/tenants", tenantForm, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => setActiveTab("tenants"),
+            onSuccess: () => {
+                setActiveTab("tenants");
+                setTenantsPage(1);
+            },
         });
     };
 
     const startTenantFromApplication = (app) => {
+        const nextSet = new Set(provisioningAppIds);
+        nextSet.add(app.id);
+        setProvisioningAppIds(nextSet);
+
         // Derive a simple, unique database name from company name (slug-like)
         const slug = app.company_name
             .toLowerCase()
@@ -116,7 +134,17 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
         Inertia.post("/superadmin/tenants", payload, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => setActiveTab("paidApps"),
+            onSuccess: () => {
+                const cleared = new Set(provisioningAppIds);
+                cleared.delete(app.id);
+                setProvisioningAppIds(cleared);
+                setActiveTab("paidApps");
+            },
+            onError: () => {
+                const cleared = new Set(provisioningAppIds);
+                cleared.delete(app.id);
+                setProvisioningAppIds(cleared);
+            },
         });
     };
 
@@ -125,7 +153,10 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
         Inertia.post("/subscription-plans", planForm, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => setActiveTab("plans"),
+            onSuccess: () => {
+                setActiveTab("plans");
+                setPlansPage(1);
+            },
         });
     };
     const handleUserChange = (e) =>
@@ -133,10 +164,15 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
 
     const handleUserSubmit = (e) => {
         e.preventDefault();
+        setUserSubmitting(true);
         Inertia.post("/users", userForm, {
             preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => setActiveTab("users"),
+            preserveState: false,
+            onSuccess: () => {
+                setActiveTab("users");
+                setUsersPage(1);
+            },
+            onFinish: () => setUserSubmitting(false),
         });
     };
 
@@ -305,6 +341,20 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+            {(flashSuccess || flashError) && (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+                    {flashSuccess && (
+                        <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 text-sm">
+                            {flashSuccess}
+                        </div>
+                    )}
+                    {flashError && (
+                        <div className={`${flashSuccess ? 'mt-3 ' : ''}p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 text-sm`}>
+                            {flashError}
+                        </div>
+                    )}
+                </div>
+            )}
             {editingTenant && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
@@ -844,7 +894,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                                 {app.payment_status}
                                                             </span>
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.created_at}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDateTime(app.created_at)}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                                             {app.tenant_created ? (
                                                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
@@ -1099,7 +1149,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                <h3 className="text-lg font-semibold mb-4">Create New User</h3>
+                                <h3 className="text-lg font-semibold mb-4">Create Company Admin</h3>
                                 <form onSubmit={handleUserSubmit} className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -1111,6 +1161,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                 value={userForm.tenantid}
                                                 onChange={handleUserChange}
                                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                                required
                                             />
                                         </div>
                                         <div>
@@ -1137,56 +1188,15 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                 required
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-                                            <select
-                                                name="role"
-                                                value={userForm.role}
-                                                onChange={handleUserChange}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                required
-                                            >
-                                                <option value="">Select a role</option>
-                                                <option value="Super_admin">Super Admin</option>
-                                                <option value="company_admin">Company Admin</option>
-                                                <option value="hr_manager">HR Manager</option>
-                                                <option value="finance_manager">Finance Manager</option>
-                                                <option value="department_manager">Department Manager</option>
-                                                <option value="employee">Employee</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-                                            <input
-                                                type="password"
-                                                name="password"
-                                                placeholder="••••••••"
-                                                value={userForm.password}
-                                                onChange={handleUserChange}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm Password</label>
-                                            <input
-                                                type="password"
-                                                name="password_confirmation"
-                                                placeholder="••••••••"
-                                                value={userForm.password_confirmation}
-                                                onChange={handleUserChange}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                                required
-                                            />
-                                        </div>
                                     </div>
                                     <div className="flex justify-end pt-2">
                                         <button
                                             type="submit"
-                                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                            disabled={userSubmitting}
+                                            className={`inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors ${userSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
                                         >
                                             <FiPlus className="mr-2" />
-                                            Create User
+                                            {userSubmitting ? 'Creating…' : 'Create Company Admin'}
                                         </button>
                                     </div>
                                 </form>
@@ -1234,7 +1244,7 @@ export default function Dashboard({ auth, tenants, paidApplications, subscriptio
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{user.name}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.role}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.created_at}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDateTime(user.created_at)}</td>
                                                     </tr>
                                                 ))
                                             ) : (

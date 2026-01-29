@@ -188,6 +188,9 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
         const method = (options.method || 'GET').toUpperCase();
         const isJsonBody = options.body && typeof options.body === 'string';
 
+        const csrf = csrfToken();
+        const xsrf = xsrfTokenFromCookie();
+
         const res = await fetch(normalizeSameOriginUrl(url), {
             ...options,
             method,
@@ -196,8 +199,8 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                 Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
                 ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
-                ...(csrfToken() ? { 'X-CSRF-TOKEN': csrfToken() } : {}),
-                ...(xsrfTokenFromCookie() ? { 'X-XSRF-TOKEN': xsrfTokenFromCookie() } : {}),
+                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+                ...(!xsrf && csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
                 ...(options.headers || {}),
             },
         });
@@ -253,16 +256,31 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
 
     const pendingCount = useMemo(() => (leaveRequests || []).filter((r) => r?.status === 'pending').length, [leaveRequests]);
 
+    const employeesSorted = useMemo(() => {
+        const list = Array.isArray(employees) ? employees : [];
+        return [...list].sort((a, b) => (Number(b?.id) || 0) - (Number(a?.id) || 0));
+    }, [employees]);
+
+    const leaveRequestsSorted = useMemo(() => {
+        const list = Array.isArray(leaveRequests) ? leaveRequests : [];
+        return [...list].sort((a, b) => (Number(b?.id) || 0) - (Number(a?.id) || 0));
+    }, [leaveRequests]);
+
+    const reviewsSorted = useMemo(() => {
+        const list = Array.isArray(reviews) ? reviews : [];
+        return [...list].sort((a, b) => (Number(b?.id) || 0) - (Number(a?.id) || 0));
+    }, [reviews]);
+
     const filteredEmployees = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
-        if (!q) return employees || [];
-        return (employees || []).filter((e) => {
+        if (!q) return employeesSorted;
+        return employeesSorted.filter((e) => {
             const name = e?.user?.name || '';
             const email = e?.user?.email || '';
             const title = e?.job_title || '';
             return `${name} ${email} ${title}`.toLowerCase().includes(q);
         });
-    }, [employees, searchTerm]);
+    }, [employeesSorted, searchTerm]);
 
     const pagedEmployees = useMemo(() => {
         const size = Number(teamPageSize) || 10;
@@ -274,14 +292,14 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
 
     const filteredLeaveRequests = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
-        if (!q) return leaveRequests || [];
-        return (leaveRequests || []).filter((r) => {
+        if (!q) return leaveRequestsSorted;
+        return leaveRequestsSorted.filter((r) => {
             const name = r?.employee?.user?.name || '';
             const type = r?.leave_type || '';
             const status = r?.status || '';
             return `${name} ${type} ${status} ${r?.start_date || ''} ${r?.end_date || ''}`.toLowerCase().includes(q);
         });
-    }, [leaveRequests, searchTerm]);
+    }, [leaveRequestsSorted, searchTerm]);
 
     const pagedLeaveRequests = useMemo(() => {
         const size = Number(leavePageSize) || 10;
@@ -293,13 +311,13 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
 
     const filteredReviews = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
-        if (!q) return reviews || [];
-        return (reviews || []).filter((r) => {
+        if (!q) return reviewsSorted;
+        return reviewsSorted.filter((r) => {
             const name = r?.employee?.user?.name || '';
             const period = `${r?.period_start || ''} ${r?.period_end || ''}`;
             return `${name} ${period} ${r?.rating ?? ''}`.toLowerCase().includes(q);
         });
-    }, [reviews, searchTerm]);
+    }, [reviewsSorted, searchTerm]);
 
     const pagedReviews = useMemo(() => {
         const size = Number(reviewsPageSize) || 10;
@@ -417,14 +435,14 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
 
             <Modal show={rejectModalOpen} onClose={() => setRejectModalOpen(false)}>
                 <form onSubmit={submitReject} className="p-6">
-                    <h2 className="text-lg font-semibold text-gray-900">Reject Leave Request</h2>
-                    <p className="text-sm text-gray-600 mt-1">Add an optional reason for rejection.</p>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Reject Leave Request</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Add an optional reason for rejection.</p>
                     <div className="mt-4">
                         <label className="block text-sm font-medium mb-1">Reason</label>
                         <textarea
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
-                            className="w-full rounded-lg border-gray-300"
+                            className="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                             rows="4"
                         />
                     </div>
@@ -432,7 +450,7 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                         <button
                             type="button"
                             onClick={() => setRejectModalOpen(false)}
-                            className="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-100"
+                            className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
                         >
                             Cancel
                         </button>
@@ -585,9 +603,16 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 lg:col-span-3">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Logged in as</p>
-                        <p className="text-lg font-semibold">{user?.name} <span className="text-sm text-gray-500 dark:text-gray-400">({user?.role})</span></p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Tenant DB: {tenant_db}</p>
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Welcome back</p>
+                                <p className="text-lg font-semibold text-gray-900 dark:text-white">{user?.name || 'User'}</p>
+                            </div>
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-200 dark:border-purple-800">
+                                Department Manager
+                            </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Approve leave requests, track attendance, and submit performance reviews.</p>
                     </div>
                 </div>
 
@@ -639,7 +664,13 @@ export default function DepartmentManagerDashboard({ user, tenant_db }) {
                                 <button
                                     key={t.key}
                                     type="button"
-                                    onClick={() => setActiveTab(t.key)}
+                                    onClick={() => {
+                                        setActiveTab(t.key);
+                                        setTeamPage(1);
+                                        setLeavePage(1);
+                                        setAttendancePage(1);
+                                        setReviewsPage(1);
+                                    }}
                                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all ${
                                         activeTab === t.key
                                             ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-md transform scale-105'

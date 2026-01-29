@@ -132,16 +132,34 @@ export default function EmployeeDashboard({ user }) {
 
     const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-    const appBaseUrl = () => {
-        const meta = document.querySelector('meta[name="app-base-url"]');
-        const v = meta?.getAttribute('content');
-        return (v || '').replace(/\/+$/, '');
+    const appBasePath = () => {
+        const raw = document.querySelector('meta[name="app-base-url"]')?.getAttribute('content');
+        if (!raw) return '';
+        try {
+            const u = new URL(raw, window.location.origin);
+            const p = (u.pathname || '/').replace(/\/+$/, '');
+            return p === '/' ? '' : p;
+        } catch {
+            return '';
+        }
     };
 
-    const endpoint = (path) => {
-        const base = appBaseUrl();
-        const cleanPath = String(path || '').replace(/^\/+/, '');
-        return base ? `${base}/${cleanPath}` : `/${cleanPath}`;
+    const applyBasePath = (path) => {
+        const base = appBasePath();
+        if (!base) return path;
+        if (path === base || path.startsWith(`${base}/`)) return path;
+        return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+    };
+
+    const normalizeSameOriginUrl = (url) => {
+        try {
+            const u = new URL(url, window.location.href);
+            return applyBasePath(`${u.pathname}${u.search}${u.hash}`);
+        } catch {
+            const v = String(url || '');
+            const p = v.startsWith('/') ? v : `/${v}`;
+            return applyBasePath(p);
+        }
     };
 
     const getCookie = (name) => {
@@ -166,7 +184,7 @@ export default function EmployeeDashboard({ user }) {
         const method = (options.method || 'GET').toUpperCase();
         const isJsonBody = options.body && typeof options.body === 'string';
 
-        const res = await fetch(endpoint(url), {
+        const res = await fetch(normalizeSameOriginUrl(url), {
             ...options,
             method,
             credentials: 'include',
@@ -214,11 +232,6 @@ export default function EmployeeDashboard({ user }) {
     const canMarkAttendance = (!attendancePolicy.requires_company_wifi || companyWifiVerified)
         && (!attendancePolicy.requires_visual_confirmation || visualConfirmed);
 
-    const getCsrfToken = () => {
-        const el = document.querySelector('meta[name="csrf-token"]');
-        return el ? el.getAttribute('content') : '';
-    };
-
     const submitAttendance = async (type) => {
         setAttendanceError('');
         if (!canMarkAttendance) return;
@@ -229,8 +242,8 @@ export default function EmployeeDashboard({ user }) {
         setAttendanceSubmitLoading(true);
         try {
             const url = type === 'check_in'
-                ? 'tenant/employee/attendance/check-in'
-                : 'tenant/employee/attendance/check-out';
+                ? '/tenant/employee/attendance/check-in'
+                : '/tenant/employee/attendance/check-out';
             const data = await fetchJson(url, {
                 method: 'POST',
                 body: JSON.stringify({}),
@@ -691,14 +704,14 @@ export default function EmployeeDashboard({ user }) {
                                         <div className="mb-4 space-y-2">
                                             {wifiCheckMessage && (
                                                 <div className={`rounded-lg border p-3 text-sm ${companyWifiVerified
-                                                    ? 'bg-green-50 border-green-200 text-green-800'
-                                                    : 'bg-gray-50 border-gray-200 text-gray-700'
+                                                    ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                                                    : 'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900/40 dark:border-gray-700 dark:text-gray-200'
                                                     }`}>
                                                     {wifiCheckMessage}
                                                 </div>
                                             )}
                                             {attendanceError && (
-                                                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+                                                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">
                                                     {attendanceError}
                                                 </div>
                                             )}
@@ -949,7 +962,7 @@ export default function EmployeeDashboard({ user }) {
                                         <button
                                             type="button"
                                             onClick={loadPayslips}
-                                            className="px-4 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200"
+                                            className="px-4 py-2 rounded-lg text-sm font-semibold text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50"
                                         >
                                             Refresh
                                         </button>
@@ -969,7 +982,7 @@ export default function EmployeeDashboard({ user }) {
                                             <div className="text-sm text-gray-600 dark:text-gray-400">Loading pay slips…</div>
                                         )}
                                         {payslipsError && (
-                                            <div className="mt-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">{payslipsError}</div>
+                                            <div className="mt-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">{payslipsError}</div>
                                         )}
                                     </div>
                                 )}
@@ -990,7 +1003,7 @@ export default function EmployeeDashboard({ user }) {
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">{p.period}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{p.net}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                                                             {p.status}
                                                         </span>
                                                     </td>

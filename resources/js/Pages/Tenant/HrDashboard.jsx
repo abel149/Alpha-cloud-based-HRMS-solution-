@@ -36,16 +36,26 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
         employment_type: 'full_time',
     });
 
+    const employeesSorted = useMemo(() => {
+        const list = Array.isArray(employees) ? employees : [];
+        return [...list].sort((a, b) => (Number(b?.id) || 0) - (Number(a?.id) || 0));
+    }, [employees]);
+
+    const leaveRequestsSorted = useMemo(() => {
+        const list = Array.isArray(leaveRequests) ? leaveRequests : [];
+        return [...list].sort((a, b) => (Number(b?.id) || 0) - (Number(a?.id) || 0));
+    }, [leaveRequests]);
+
     const filteredEmployees = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
-        if (!q) return employees;
-        return employees.filter((e) => {
+        if (!q) return employeesSorted;
+        return employeesSorted.filter((e) => {
             const name = e?.user?.name || '';
             const email = e?.user?.email || '';
             const code = e?.employee_code || '';
             return `${name} ${email} ${code}`.toLowerCase().includes(q);
         });
-    }, [employees, searchTerm]);
+    }, [employeesSorted, searchTerm]);
 
     const pagedEmployees = useMemo(() => {
         const size = Number(employeesPageSize) || 10;
@@ -57,15 +67,15 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
 
     const filteredLeaveRequests = useMemo(() => {
         const q = (searchTerm || '').toLowerCase();
-        if (!q) return leaveRequests;
-        return leaveRequests.filter((r) => {
+        if (!q) return leaveRequestsSorted;
+        return leaveRequestsSorted.filter((r) => {
             const name = r?.employee?.user?.name || '';
             const email = r?.employee?.user?.email || '';
             const type = r?.leave_type || '';
             const status = r?.status || '';
             return `${name} ${email} ${type} ${status}`.toLowerCase().includes(q);
         });
-    }, [leaveRequests, searchTerm]);
+    }, [leaveRequestsSorted, searchTerm]);
 
     const pagedLeaveRequests = useMemo(() => {
         const size = Number(leavePageSize) || 10;
@@ -75,24 +85,114 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
         return filteredLeaveRequests.slice(start, start + size);
     }, [filteredLeaveRequests, leavePage, leavePageSize]);
 
-    const filteredAttendanceLogs = useMemo(() => {
-        const q = (searchTerm || '').toLowerCase();
-        if (!q) return attendanceLogs;
-        return attendanceLogs.filter((l) => {
-            const name = l?.employee?.user?.name || '';
-            const email = l?.employee?.user?.email || '';
-            const type = l?.type || '';
-            return `${name} ${email} ${type}`.toLowerCase().includes(q);
+    const attendanceRows = useMemo(() => {
+        const sorted = [...(attendanceLogs || [])].sort((a, b) => {
+            const ad = a?.logged_at ? new Date(a.logged_at).getTime() : 0;
+            const bd = b?.logged_at ? new Date(b.logged_at).getTime() : 0;
+            return ad - bd;
         });
-    }, [attendanceLogs, searchTerm]);
 
-    const pagedAttendanceLogs = useMemo(() => {
+        const byKey = new Map();
+
+        for (const l of sorted) {
+            const empId = l?.employee_id ?? l?.employee?.id;
+            const day = l?.logged_at ? String(l.logged_at).slice(0, 10) : '';
+            if (!empId || !day) continue;
+
+            const key = `${empId}:${day}`;
+            const existing = byKey.get(key);
+            const row = existing || {
+                key,
+                employee_id: empId,
+                employee: l?.employee,
+                day,
+                check_in_at: null,
+                check_out_at: null,
+                wifi_in: null,
+                wifi_out: null,
+                visual_in: null,
+                visual_out: null,
+            };
+
+            if (l?.type === 'check_in') {
+                if (!row.check_in_at || new Date(l.logged_at).getTime() < new Date(row.check_in_at).getTime()) {
+                    row.check_in_at = l.logged_at;
+                    row.wifi_in = Boolean(l?.wifi_verified);
+                    row.visual_in = Boolean(l?.visual_confirmed_at);
+                }
+            }
+
+            if (l?.type === 'check_out') {
+                if (!row.check_out_at || new Date(l.logged_at).getTime() > new Date(row.check_out_at).getTime()) {
+                    row.check_out_at = l.logged_at;
+                    row.wifi_out = Boolean(l?.wifi_verified);
+                    row.visual_out = Boolean(l?.visual_confirmed_at);
+                }
+            }
+
+            byKey.set(key, row);
+        }
+
+        const rows = Array.from(byKey.values());
+        rows.sort((a, b) => {
+            const d = String(b.day).localeCompare(String(a.day));
+            if (d) return d;
+            const an = a?.employee?.user?.name || '';
+            const bn = b?.employee?.user?.name || '';
+            return an.localeCompare(bn);
+        });
+
+        return rows;
+    }, [attendanceLogs]);
+
+    const filteredAttendanceRows = useMemo(() => {
+        const q = (searchTerm || '').toLowerCase();
+        if (!q) return attendanceRows;
+        return attendanceRows.filter((r) => {
+            const name = r?.employee?.user?.name || '';
+            const email = r?.employee?.user?.email || '';
+            const day = r?.day || '';
+            return `${name} ${email} ${day}`.toLowerCase().includes(q);
+        });
+    }, [attendanceRows, searchTerm]);
+
+    const pagedAttendanceRows = useMemo(() => {
         const size = Number(attendancePageSize) || 10;
-        const totalPages = Math.max(1, Math.ceil((filteredAttendanceLogs.length || 0) / size));
+        const totalPages = Math.max(1, Math.ceil((filteredAttendanceRows.length || 0) / size));
         const page = Math.min(Math.max(1, Number(attendancePage) || 1), totalPages);
         const start = (page - 1) * size;
-        return filteredAttendanceLogs.slice(start, start + size);
-    }, [filteredAttendanceLogs, attendancePage, attendancePageSize]);
+        return filteredAttendanceRows.slice(start, start + size);
+    }, [filteredAttendanceRows, attendancePage, attendancePageSize]);
+
+    const formatTime = (v) => {
+        if (!v) return '—';
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const formatDate = (v) => {
+        if (!v) return '—';
+        const s = String(v);
+        const m = s.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+        const d = m
+            ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+            : new Date(s);
+        if (Number.isNaN(d.getTime())) return s;
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+    };
+
+    const formatDuration = (start, end) => {
+        if (!start || !end) return '—';
+        const a = new Date(start).getTime();
+        const b = new Date(end).getTime();
+        if (!a || !b || b < a) return '—';
+        const mins = Math.floor((b - a) / 60000);
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        if (h <= 0) return `${m}m`;
+        return `${h}h ${m}m`;
+    };
 
     const submitHire = (e) => {
         e.preventDefault();
@@ -269,7 +369,12 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                 <button
                                     key={tab.key}
                                     type="button"
-                                    onClick={() => setActiveTab(tab.key)}
+                                    onClick={() => {
+                                        setActiveTab(tab.key);
+                                        setEmployeesPage(1);
+                                        setLeavePage(1);
+                                        setAttendancePage(1);
+                                    }}
                                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all ${
                                         activeTab === tab.key
                                             ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md transform scale-105'
@@ -431,7 +536,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                                         <div className="text-sm text-gray-500 dark:text-gray-400">{req?.employee?.user?.email}</div>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm">{req.leave_type}</td>
-                                                    <td className="px-6 py-4 text-sm">{req.start_date} → {req.end_date}</td>
+                                                    <td className="px-6 py-4 text-sm">{formatDate(req.start_date)} → {formatDate(req.end_date)}</td>
                                                     <td className="px-6 py-4 text-sm">
                                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                                             req.status === 'approved'
@@ -489,7 +594,7 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                     <PaginationControls
                                         page={attendancePage}
                                         pageSize={attendancePageSize}
-                                        total={filteredAttendanceLogs.length}
+                                        total={filteredAttendanceRows.length}
                                         onPageChange={(p) => setAttendancePage(p)}
                                         onPageSizeChange={(n) => { setAttendancePageSize(n); setAttendancePage(1); }}
                                     />
@@ -499,31 +604,37 @@ export default function HrDashboard({ employees = [], departments = [], leaveReq
                                     <table className="min-w-full">
                                         <thead className="bg-gray-50 dark:bg-gray-900/50">
                                             <tr>
+                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Day</th>
                                                 <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Employee</th>
-                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
-                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Time</th>
-                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">IP</th>
+                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Check In</th>
+                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Check Out</th>
+                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Time Worked</th>
                                                 <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Wi‑Fi</th>
-                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Fingerprint</th>
+                                                <th className="text-left px-6 py-4 text-sm font-medium text-gray-500 dark:text-gray-400">Visual</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {pagedAttendanceLogs.map((log) => (
-                                                <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                            {pagedAttendanceRows.map((row) => (
+                                                <tr key={row.key} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                                    <td className="px-6 py-4 text-sm">{row.day}</td>
                                                     <td className="px-6 py-4">
-                                                        <div className="font-medium">{log?.employee?.user?.name}</div>
-                                                        <div className="text-sm text-gray-500 dark:text-gray-400">{log?.employee?.user?.email}</div>
+                                                        <div className="font-medium">{row?.employee?.user?.name}</div>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400">{row?.employee?.user?.email}</div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-sm">{log.type}</td>
-                                                    <td className="px-6 py-4 text-sm">{log.logged_at}</td>
-                                                    <td className="px-6 py-4 text-sm">{log.ip_address || '—'}</td>
-                                                    <td className="px-6 py-4 text-sm">{log.wifi_verified ? 'Yes' : 'No'}</td>
-                                                    <td className="px-6 py-4 text-sm">{log.fingerprint_verified ? 'Yes' : 'No'}</td>
+                                                    <td className="px-6 py-4 text-sm">{formatTime(row.check_in_at)}</td>
+                                                    <td className="px-6 py-4 text-sm">{formatTime(row.check_out_at)}</td>
+                                                    <td className="px-6 py-4 text-sm">{formatDuration(row.check_in_at, row.check_out_at)}</td>
+                                                    <td className="px-6 py-4 text-sm">
+                                                        {(row.wifi_in === true || row.wifi_out === true) ? 'Yes' : (row.wifi_in === false || row.wifi_out === false) ? 'No' : '—'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm">
+                                                        {(row.visual_in === true || row.visual_out === true) ? 'Yes' : (row.visual_in === false || row.visual_out === false) ? 'No' : '—'}
+                                                    </td>
                                                 </tr>
                                             ))}
-                                            {pagedAttendanceLogs.length === 0 && (
+                                            {pagedAttendanceRows.length === 0 && (
                                                 <tr>
-                                                    <td className="px-6 py-10 text-center text-gray-500 dark:text-gray-400" colSpan="6">No attendance logs found.</td>
+                                                    <td className="px-6 py-10 text-center text-gray-500 dark:text-gray-400" colSpan="7">No attendance logs found.</td>
                                                 </tr>
                                             )}
                                         </tbody>
