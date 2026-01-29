@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withCommands([
         \App\Console\Commands\MigrateTenants::class,
+        \App\Console\Commands\SeedTenantDemo::class,
     ])
     ->withExceptions(function (Exceptions $exceptions): void {
         //
