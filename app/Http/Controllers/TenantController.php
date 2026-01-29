@@ -106,6 +106,69 @@ class TenantController extends Controller
                 }
             })->update(['tenant_created' => 1]);
 
+            // Auto-create Company Admin only when provisioning from a Paid Application.
+            if ($request->filled('tenant_application_id') || $request->filled('subscriptionId')) {
+                try {
+                    $application = null;
+
+                    if ($request->filled('tenant_application_id')) {
+                        $application = TenantApplication::where('id', (int) $request->tenant_application_id)->first();
+                    }
+
+                    if (!$application && $request->filled('subscriptionId')) {
+                        $application = TenantApplication::where('transaction_id', (string) $request->subscriptionId)->first();
+                    }
+
+                    if ($application && (string) $application->payment_status === 'Paid') {
+                        $adminEmail = strtolower(trim((string) $application->email));
+                        $adminName = trim((string) $application->company_name);
+                        if ($adminName === '') {
+                            $adminName = 'Company Admin';
+                        }
+
+                        $existing = User::where('email', $adminEmail)->first();
+
+                        if (!$existing) {
+                            $tempPasswordPlain = (string) \Illuminate\Support\Str::random(12);
+                            $tempPasswordHashed = Hash::make($tempPasswordPlain);
+
+                            $createdAdmin = User::create([
+                                'name' => $adminName,
+                                'email' => $adminEmail,
+                                'password' => $tempPasswordHashed,
+                                'role' => 'company_admin',
+                                'tenant_id' => $tenant->id,
+                            ]);
+
+                            try {
+                                Notification::route('mail', $createdAdmin->email)->notify(new CompanyAdminCredentialsNotification(
+                                    tenantId: $tenant->id,
+                                    tempPassword: $tempPasswordPlain,
+                                    name: $createdAdmin->name,
+                                ));
+                            } catch (\Throwable $e) {
+                                Log::error('Failed to send company admin credentials email (auto provision)', [
+                                    'tenant_id' => $tenant->id,
+                                    'email' => $createdAdmin->email,
+                                    'message' => $e->getMessage(),
+                                ]);
+                            }
+                        } else {
+                            Log::warning('Skipping auto company admin creation because email already exists', [
+                                'tenant_id' => $tenant->id,
+                                'email' => $adminEmail,
+                                'existing_user_id' => $existing->id,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Auto-provision company admin failed', [
+                        'tenant_id' => $tenant->id,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // ✅ Redirect back with success message (Inertia-friendly)
             return redirect()->route('tenants.index')->with('success', 'Tenant created successfully!');
         } catch (Exception $e) {
@@ -234,6 +297,7 @@ class TenantController extends Controller
             Notification::route('mail', $user->email)->notify(new CompanyAdminCredentialsNotification(
                 tenantId: $tenantId,
                 tempPassword: $tempPasswordPlain,
+                name: $user->name,
             ));
         } catch (\Throwable $e) {
             Log::error('Failed to send company admin credentials email', [

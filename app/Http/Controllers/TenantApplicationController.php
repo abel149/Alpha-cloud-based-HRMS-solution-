@@ -11,6 +11,15 @@ use App\Models\SubscriptionPlan;
 
 class TenantApplicationController extends Controller
 {
+    public function showApplyForm()
+    {
+        $plans = SubscriptionPlan::orderByDesc('id')->get();
+
+        return Inertia::render('Apply', [
+            'subscriptionPlans' => $plans,
+        ]);
+    }
+
     public function apply(Request $request, ChapaService $chapa)
     {
         $request->validate([
@@ -19,7 +28,19 @@ class TenantApplicationController extends Controller
             'plan' => 'required|string',
         ]);
 
+        $plan = SubscriptionPlan::where('planId', (string) $request->plan)->first();
+        if (!$plan) {
+            return response()->json([
+                'error' => 'Invalid subscription plan selected.',
+            ], 422);
+        }
 
+        $amount = (float) $plan->price;
+        if ($amount <= 0) {
+            return response()->json([
+                'error' => 'Subscription plan price is not configured correctly.',
+            ], 422);
+        }
 
         // 2. Generate unique transaction ref
         $tx_ref = uniqid('tenant_');
@@ -32,9 +53,6 @@ class TenantApplicationController extends Controller
             'payment_status' => 'Pending',
             'transaction_id' => $tx_ref,
         ]);
-
-        // 3. Determine amount dynamically
-        $amount = $request->plan === 'pro' ? 1000 : 500;
 
         // 4. Resolve callback URL
         // Prefer explicit CHAPA_CALLBACK_URL if set, otherwise fall back to route URL

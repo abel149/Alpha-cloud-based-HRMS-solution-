@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Schema;
 
 class TenantEmployeeController extends Controller
 {
+    private ?bool $cachedHasPayrollSchema = null;
+    private ?bool $cachedHasPayrollItemsSchema = null;
+
     private function currentEmployee(): ?Employee
     {
         $tenantUser = TenantUser::where('email', auth()->user()->email)->first();
@@ -25,17 +28,30 @@ class TenantEmployeeController extends Controller
 
     private function tenantHasPayrollSchema(): bool
     {
-        return Schema::connection('Tenant')->hasTable('payrolls')
+        if ($this->cachedHasPayrollSchema !== null) {
+            return $this->cachedHasPayrollSchema;
+        }
+
+        $ok = Schema::connection('Tenant')->hasTable('payrolls')
             && Schema::connection('Tenant')->hasColumn('payrolls', 'month')
             && Schema::connection('Tenant')->hasColumn('payrolls', 'year');
+
+        $this->cachedHasPayrollSchema = $ok;
+        return $ok;
     }
 
     private function tenantHasPayrollItemsSchema(): bool
     {
-        return Schema::connection('Tenant')->hasTable('payroll_items');
+        if ($this->cachedHasPayrollItemsSchema !== null) {
+            return $this->cachedHasPayrollItemsSchema;
+        }
+
+        $ok = Schema::connection('Tenant')->hasTable('payroll_items');
+        $this->cachedHasPayrollItemsSchema = $ok;
+        return $ok;
     }
 
-    public function listLeaveRequests()
+    public function listLeaveRequests(Request $request)
     {
         $tenantUser = TenantUser::where('email', auth()->user()->email)->first();
         $employee = $tenantUser
@@ -45,7 +61,11 @@ class TenantEmployeeController extends Controller
             return response()->json(['ok' => true, 'requests' => []]);
         }
 
-        $requests = LeaveRequest::where('employee_id', $employee->id)->orderByDesc('id')->get();
+        $requests = LeaveRequest::with(['approver'])
+            ->where('employee_id', $employee->id)
+            ->orderByDesc('id')
+            ->get();
+
         return response()->json(['ok' => true, 'requests' => $requests]);
     }
 
