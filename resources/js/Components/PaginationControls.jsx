@@ -8,6 +8,7 @@ export default function PaginationControls({
     onPageSizeChange,
     pageSizeOptions = [5, 10, 25, 50],
     className = '',
+    scrollToTopOnChange = true,
 }) {
     const totalPages = useMemo(() => Math.max(1, Math.ceil((Number(total) || 0) / (Number(pageSize) || 1))), [total, pageSize]);
 
@@ -17,6 +18,26 @@ export default function PaginationControls({
 
     const canPrev = safePage > 1;
     const canNext = safePage < totalPages;
+
+    const maybeScrollToTop = () => {
+        if (!scrollToTopOnChange) return;
+        if (typeof window === 'undefined') return;
+        try {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {
+            window.scrollTo(0, 0);
+        }
+    };
+
+    const handlePageChange = (nextPage) => {
+        maybeScrollToTop();
+        onPageChange?.(nextPage);
+    };
+
+    const handlePageSizeChange = (nextSize) => {
+        maybeScrollToTop();
+        onPageSizeChange?.(nextSize);
+    };
 
     return (
         <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${className}`}
@@ -32,7 +53,7 @@ export default function PaginationControls({
                     <span className="text-sm text-gray-600 dark:text-gray-400">Rows</span>
                     <select
                         value={String(pageSize)}
-                        onChange={(e) => onPageSizeChange?.(Number(e.target.value) || 10)}
+                        onChange={(e) => handlePageSizeChange(Number(e.target.value) || 10)}
                         className="rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
                     >
                         {pageSizeOptions.map((n) => (
@@ -43,7 +64,7 @@ export default function PaginationControls({
 
                 <button
                     type="button"
-                    onClick={() => onPageChange?.(safePage - 1)}
+                    onClick={() => handlePageChange(safePage - 1)}
                     disabled={!canPrev}
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
@@ -54,7 +75,7 @@ export default function PaginationControls({
                 </div>
                 <button
                     type="button"
-                    onClick={() => onPageChange?.(safePage + 1)}
+                    onClick={() => handlePageChange(safePage + 1)}
                     disabled={!canNext}
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
